@@ -3,7 +3,7 @@
 
 """
 ######################################################################
-Project       DoxyUML
+Project       nxUML
 (c) copyright 2014
 ######################################################################
 @file         brownieDoc.py
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         #print(len(file_list))
 
     # Load stored call graph and parse new headers
-    from DoxyUML.brownie_doc import BrownieCallGraph
+    from nxUML.brownie_doc import BrownieCallGraph
 
     if len(options['load']) > 0:
         import pickle

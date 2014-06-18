@@ -3,14 +3,14 @@
 
 """
 ######################################################################
-Project       DoxyUML
+Project       nxUML
 (c) copyright 2014
 ######################################################################
 @file         setup.py
 @author       Sergiy Gogolenko
 
-Setup script for DoxyUML.
-You can install DoxyUML with 'python setup.py install'
+Setup script for nxUML.
+You can install nxUML with 'python setup.py install'
 ######################################################################
 """
 from glob import glob
@@ -26,17 +26,19 @@ if sys.argv[-1] == 'setup.py':
     print()
 
 if sys.version_info[:2] < (2, 7):
-    print("DoxyUML requires Python 2.7 or later (%d.%d detected)." %
+    print("nxUML requires Python 2.7 or later (%d.%d detected)." %
           sys.version_info[:2])
     sys.exit(-1)
 
 # Write the version information.
-sys.path.insert(0, 'DoxyUML')
+sys.path.insert(0, 'nxUML')
 import release
 version = release.write_versionfile()
 sys.path.pop(0)
 
-packages=["DoxyUML",]
+packages=["nxUML",
+          "nxUML.parser",
+          "nxUML.core",]
 
 docdirbase = 'share/doc/doxyuml-%s' % version
 # add basic documentation
@@ -51,7 +53,7 @@ for d in []:
 
 # add the tests
 package_data = {
-    'DoxyUML': ['tests/*.py'],
+    'nxUML': ['tests/*.py'],
     }
 
 install_requires = ['networkx >= 1.8.0', 'CppHeaderParser >= 2.0.0']
