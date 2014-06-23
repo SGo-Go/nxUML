@@ -19,11 +19,15 @@ http://support.objecteering.com/objecteering6.1/help/us/cxx_developer/tour/code_
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 
+from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLType
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 
 import re 
+
+def debug(*args):
+    print(args)
 
 class CppTypeParser(object):
     primitive_types = {
@@ -81,10 +85,10 @@ class CppTypeParser(object):
 
     @classmethod
     def parse(cls, strType):
-        parsedType, ptr, delim = cls.parse_from_pointer(strType, 0)
+        parsedType, ptr, delim = cls.parse_from_pointer(str(strType), 0)
         if len(strType) > ptr: 
             raise ValueError('Type parsing error: check "%s" at [%s]' % (strType[ptr:], ptr))
-        #print '"%s"' %delim
+        #debug('"%s"' %delim)
         return parsedType
 
     @classmethod
@@ -103,9 +107,9 @@ class CppTypeParser(object):
         del m
 
         m = cls.reFindPrimitive.search(strType[currPointer:])
-        name, scope = m.group(3), m.group(1)
-        if(len(scope) > 0): scope = scope[:-2]
         currPointer += len(m.group(0))
+        name, scope = m.group(3), m.group(1)
+        if(len(scope) > 0): scope = scope[:-2].replace('::', '.')
         del m
         if name in cls.cpp_specifiers.keys(): 
             raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename [%s]' % (name, currPointer))
@@ -125,6 +129,7 @@ class CppTypeParser(object):
                 raise ValueError('Type parsing error: close parameters list [%s]' % currPointer)
 
             if cls.containers_single_param.has_key(name):
+                #debug('!!!!', parameters[0])
                 uml_type = parameters[0]
                 uml_type.add_qualifier(cls.containers_single_param[name])
             elif cls.containers_double_param.has_key(name):
@@ -155,7 +160,7 @@ class CppTypeParser(object):
             currPointer += len(m.group(0))
             del m
 
-        #print ptr, name, scope, delim, properties
+        #debug(ptr, name, scope, delim, properties)
         return uml_type, currPointer, delim
 
 ######################################################################
@@ -164,31 +169,38 @@ class CppTextParser(object):
     TypeParser = CppTypeParser
 
     visibility_types = {
-        'private'       : '#', 
-        'protected'     : '-', 
+        'private'       : '-', 
+        'protected'     : '#', 
         'public'        : '+',
         }
 
 
     @classmethod
-    def parse(cls, filename):
+    def parse(cls, filename, uml_pool = None):
+        if uml_pool is None: uml_pool = UMLPool()
+
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
 
         for className in cppHeader.classes:
-            cls.handle_class(None, location = cppHeader.headerFileName, **cppHeader.classes[className])
+            cls.handle_class(uml_pool, location = cppHeader.headerFileName, **cppHeader.classes[className])
 
         del cppHeader
+        return uml_pool
 
 
     @classmethod
     def create_class(cls, **data):
         # Extract data
-        uml_class = UMLClass(data['name'],
-                             package  = data['namespace'],
-                             location = data['location'],
-                             parent   = data['parent'],)
+        uml_class = UMLClass(str(data['name']),
+                             package   = str(data['namespace']).replace('::', '.'),
+                             location  = data['location'],
+                             methods   = [],
+                             attribs   = [],
+                             modifiers = [],
+                             parent    = data['parent'],)
+        #debug('!!!', uml_class.__dict__)
 
         # Work around class attributes
         for visibility in cls.visibility_types.keys():
@@ -207,7 +219,7 @@ class CppTextParser(object):
         # {'line_number':, 'constant': , 'name': , 'reference': , 'type': , 'static': , 'pointer': }
         type       = cls.TypeParser.parse(kwargs['type'])
         visibility = cls.visibility_types.get(kwargs['visibility'], ' ')
-        uml_attrib = UMLClassAttribute(kwargs['name'], 
+        uml_attrib = UMLClassAttribute(str(kwargs['name']), 
                                        type       = type, 
                                        visibility = visibility,
                                        utility    = kwargs['static'])
@@ -220,7 +232,7 @@ class CppTextParser(object):
         elif kwargs['destructor']: 
             name   = "<<destroy>>"
         else:
-            name   = kwargs['name']
+            name   = str(kwargs['name'])
 
         abstract   = kwargs['pure_virtual']
         static     = kwargs['static']
@@ -263,14 +275,16 @@ class CppTextParser(object):
     @classmethod
     def handle_class(cls, uml_pool, **data):
         uml_class = cls.create_class(**data)
+        uml_pool.add_class(uml_class)
 
         # Work around inheritances of class
         for gener_link in data['inherits']:
-            cls.handle_generalization(uml_pool, child = uml_class.full_name, parent = gener_link['class'], **gener_link)
-
-        print uml_class
+            cls.handle_generalization(uml_pool, 
+                                      child = uml_class.full_name.replace('.', '::'), 
+                                      parent = gener_link['class'], 
+                                      **gener_link)
 
     @classmethod
     def handle_generalization(cls, uml_pool, **kwargs):
         uml_generalization = cls.create_generalization(**kwargs)
-        print uml_generalization
+        uml_pool.add_relationship(uml_generalization)

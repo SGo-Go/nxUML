@@ -9,16 +9,9 @@ Project       nxUML
 @file         __iniy__.py
 @author       Sergiy Gogolenko
 
-Init-file for folder with core nxUML classes.
+Init-file for folder with parsers.
 ######################################################################
 """
 
-from nxUML.core.uml_pool import *
-
-from nxUML.core.uml_class_diag import UMLClassDiagram
-
-# try:
-#     from nxUML.core.uml_class_diag import UMLClassDiagram
-# except:
-#     pass
+from nxUML.drawing.nxuml_agraph import *
 

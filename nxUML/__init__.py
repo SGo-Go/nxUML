@@ -39,3 +39,6 @@ from nxUML.core import *
 
 import nxUML.parser
 from nxUML.parser import *
+
+import nxUML.drawing
+from nxUML.drawing import *

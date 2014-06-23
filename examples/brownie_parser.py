@@ -66,7 +66,7 @@ class BrownieTextParser(CppTextParser):
     @classmethod
     def handle_class(cls, uml_pool, **kwargs):
         if kwargs['parent'] is None:
-            super(BrownieTextParser,cls).handle_class(None, **kwargs)
+            super(BrownieTextParser,cls).handle_class(uml_pool, **kwargs)
 
 
     @classmethod
@@ -76,7 +76,7 @@ class BrownieTextParser(CppTextParser):
         if parent.name == child.name:
             for prop in ('ServiceCallable', 'LocalCallable', 'LocalCallback'):
                 if prop in parent.properties: 
-                    print prop, child.name #uml_pool.classes[child.name].add_modifier(prop)
+                    uml_pool.Class[child.name].add_modifier(prop)
         else:
             super(BrownieTextParser,cls).handle_generalization(uml_pool,**kwargs)
         del parent, child
