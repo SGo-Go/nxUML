@@ -222,6 +222,7 @@ class CppTextParser(object):
         uml_attrib = UMLClassAttribute(str(kwargs['name']), 
                                        type       = type, 
                                        visibility = visibility,
+                                       constant   = kwargs['constant'],
                                        utility    = kwargs['static'])
         return uml_attrib
 

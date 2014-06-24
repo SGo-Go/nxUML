@@ -153,6 +153,18 @@ class UMLType(object):
                    parameters= "" if len(self.parameters) == 0 else map(str, self.parameters),
                    properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),)
 
+
+    def toXML(self, root = None):
+        from lxml import etree
+
+        if root is None:
+            xmlType = etree.Element("type")
+        else: xmlType = etree.SubElement(root, "type")
+        if not self.composite:
+            xmlType.set("multiplicity", "[%s]" % self.multiplicity)
+        xmlType.text = self.name
+        return xmlType
+
 ######################################################################
 
 class UMLClass(object):
@@ -247,17 +259,41 @@ class UMLClass(object):
 
     def __str__(self):
         modifiers  = self.modifiers
-        if self.is_interface: modifiers.append('interface')
-        if self.is_utility:   modifiers.append('utility')
-        modifiers.extend(self._modifiers)
         return "{line}\n{modifiers:^40}\n[{self.package}]{self.name}\n{line}\n{attributes}\n{line}\n{methods}\n{line}".\
             format(self=self, line= chr(196)*40, #unicode('\x80abc', errors='replace')*
                    attributes = "\n".join(map(str,self.attributes)),
                    methods    = "\n".join(map(str,self.methods)),
                    modifiers  = "" if len(modifiers) == 0 else "<<%s>>"%",".join(modifiers))
 
-    def toXML(self, root):
-        return None
+    def toXML(self, root = None):
+        from lxml import etree
+
+        modifiers  = self.modifiers
+
+        if root is None:
+            xmlClass = etree.Element("class")
+        else: xmlClass = etree.SubElement(root, "class")
+        xmlClass.text   = self.name
+        xmlClass.set("utility", "yes" if self.is_utility else "no")
+        if self.is_interface:
+            xmlClass.set("interface", "yes")
+        xmlModifs       = etree.SubElement(xmlClass, "modifiers")
+        xmlModifs.text  = "" if len(modifiers) == 0 else "<<%s>>"%",".join(modifiers)
+
+        if len(self.package)>0:
+            xmlClass.set("package", self.package)
+
+        if len(self.location)>0:
+            xmlClass.set("location", self.location)
+
+        xmlAttribs      = etree.SubElement(xmlClass, "attributes")
+        for attrib in self.attributes:
+            xmlAttrib = attrib.toXML(xmlAttribs)
+
+        xmlMethods      = etree.SubElement(xmlClass, "methods")
+        for method in self.methods:
+            xmlMethod = method.toXML(xmlMethods)
+        return xmlClass
 
 class UMLClassAttribute:
     def __init__(self, name, type, 
@@ -268,8 +304,8 @@ class UMLClassAttribute:
         self.type       = type
         self.visibility = visibility
         self._utility     = utility
-        # self.properties = []
-        # if kwargs['constant']: self.properties.append('readOnly') #friend, extern
+        self.properties = []
+        if constant: self.properties.append('readOnly') #friend, extern
 
     @property
     def is_utility(self):
@@ -280,6 +316,23 @@ class UMLClassAttribute:
             format(self=self, utility = 'u' if self._utility else ' ',
                    # properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),
                    )
+
+    def toXML(self, root = None):
+        from lxml import etree
+        if root is None:
+            createElem = lambda root, name: etree.Element(name)
+        else: createElem = etree.SubElement
+
+        xmlAttrib = createElem(root, "attribute",
+                               visibility = self.visibility,)
+        if self.is_utility:
+            xmlAttrib.set("utility", "yes")
+        if len(self.properties) > 0:
+            xmlAttrib.set("properties", "{%s}"%",".join(self.properties))
+
+        xmlAttrib.text  = self.name
+        xmlType         = self.type.toXML(xmlAttrib)
+        return xmlAttrib
 
 class UMLClassMethod:
     def __init__(self, name, 
@@ -322,6 +375,31 @@ class UMLClassMethod:
                    utility  = 'u' if self._utility else ' ',
                    properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),
                    rtnType  = "" if self.rtnType is None else ":%s" % self.rtnType)
+
+    def toXML(self, root = None):
+        from lxml import etree
+        if root is None:
+            createElem = lambda root, name: etree.Element(name)
+        else: createElem = etree.SubElement
+
+        xmlMethod = createElem(root, "method",
+                               visibility = self.visibility,)
+        if self.is_utility:
+            xmlMethod.set("utility", "yes")
+        if self.is_abstract:
+            xmlMethod.set("abstract", "yes")
+
+        xmlMethod.text  = self.name
+
+        if len(self.properties) > 0:
+            #print self.properties
+            xmlMethod.set("properties", "{%s}"%",".join(self.properties))
+
+        xmlRetType      = etree.SubElement(xmlMethod, 'type')
+        xmlRetType.text = self.rtnType
+        # if self.rtnType is not None:
+        #     xmlRetType      = rtnType.toXML(xmlMethod)
+        return xmlMethod
 
 ######################################################################
 # Relationships
@@ -409,7 +487,6 @@ class UMLPool(object):
         self._relationships  = []
 
     def add_class(self, uml_class):
-        #print uml_class.name, uml_class
         self.Class[uml_class.name] = uml_class
 
     def add_relationship(self, uml_relationship):
@@ -458,9 +535,9 @@ class UMLPool(object):
                 yield (uml_class)
 
     def relationships_iter(self):
-        return iter(relationships_iter)
+        return iter(self._relationships)
 
     def generalizations_iter(self, parents = None, childs = None):
-        for relationship in relationships_iter:
-            if isintance(relationship, UMLGeneralization): 
+        for relationship in self.relationships_iter():
+            if isinstance(relationship, UMLGeneralization): 
                 yield (relationship)

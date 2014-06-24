@@ -30,6 +30,7 @@ class UMLClassDiagram(MultiDiGraph):
                  with_generalizations = True,
                  with_associations    = False,
                  auto_aggregation     = False,
+                 # max_label = 4, name2URL = None,
                  data=None, #file=None,
                  **attr):
         """Constructor 
@@ -37,16 +38,18 @@ class UMLClassDiagram(MultiDiGraph):
         self._classes       = {}
         self._relationships = []
 
+        super(UMLClassDiagram, self).__init__(data=data,name=name,**attr)
+
         if uml_pool is None: 
             if classes is not None: 
                 self._classes = {cls:UMLType(cls) for cls in classes}
         else:
-            
             if classes is None: 
                 cls_list = uml_pool.Class.keys()
             else:
                 cls_list = classes
-            self.add_clases(uml_pool, )
+            self.add_clases(uml_pool, cls_list)
+
 
     def add_clases(self, uml_pool, classes, 
                    level        = 3,
@@ -55,10 +58,10 @@ class UMLClassDiagram(MultiDiGraph):
                    with_associations    = False,
                    auto_aggregation     = False):
         for uml_class in classes:
-            self.add_class(uml_class)
+            self.add_class(uml_pool.Class[uml_class])
 
-        if with_generalizations and self.pool:
-            for uml_relationship in self.pool.generalizations_iter():
+        if with_generalizations and uml_pool:
+            for uml_relationship in uml_pool.generalizations_iter():
                 self.add_relationship(uml_relationship)
 
         if with_associations: pass
@@ -71,7 +74,6 @@ class UMLClassDiagram(MultiDiGraph):
         pass
 
     def add_class(self, uml_class):
-        # print uml_class.name, uml_class
         self._classes[uml_class.id] = uml_class
         self.add_node(uml_class.id)
 
