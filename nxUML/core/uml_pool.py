@@ -278,7 +278,7 @@ class UMLClass(object):
         if self.is_interface:
             xmlClass.set("interface", "yes")
         xmlModifs       = etree.SubElement(xmlClass, "modifiers")
-        xmlModifs.text  = "" if len(modifiers) == 0 else "<<%s>>"%",".join(modifiers)
+        xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
 
         if len(self.package)>0:
             xmlClass.set("package", self.package)
@@ -293,6 +293,7 @@ class UMLClass(object):
         xmlMethods      = etree.SubElement(xmlClass, "methods")
         for method in self.methods:
             xmlMethod = method.toXML(xmlMethods)
+
         return xmlClass
 
 class UMLClassAttribute:
@@ -313,9 +314,7 @@ class UMLClassAttribute:
 
     def __str__(self):
         return " {utility}{self.visibility} {self.name}:{self.type}".\
-            format(self=self, utility = 'u' if self._utility else ' ',
-                   # properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),
-                   )
+            format(self=self, utility = 'u' if self._utility else ' ',)
 
     def toXML(self, root = None):
         from lxml import etree
@@ -329,6 +328,10 @@ class UMLClassAttribute:
             xmlAttrib.set("utility", "yes")
         if len(self.properties) > 0:
             xmlAttrib.set("properties", "{%s}"%",".join(self.properties))
+
+        # @TODO move it to uml_diagram
+        if self.__dict__.has_key('unfolding_level'):
+            xmlAttrib.set('unfolding-level', str(self.unfolding_level))
 
         xmlAttrib.text  = self.name
         xmlType         = self.type.toXML(xmlAttrib)
@@ -446,6 +449,51 @@ class UMLNaryAssociation(UMLNaryRelationship):
     def __str__(self):
         return "[{self.note}]{out}".format(\
             self=self, out = super(UMLNaryAssociation, self).__str__())
+
+######################################################################
+
+class UMLDetalization(UMLBinaryRelationship):
+    def __init__(self, multiplicity = '', properties = []):
+        self.multiplicity = multiplicity
+        self.properties   = properties
+
+class UMLAggregation(UMLBinaryRelationship):
+    def __init__(self, whole, part, attribute = None, visibility = '  '):
+        if attribute is not None:
+            self.visibility = attribute.visibility
+            self.role = attribute.name
+            self.composite = attribute.type.composite
+            self.part_detalization = UMLDetalization(
+                multiplicity = attribute.type.multiplicity,
+                properties   = attribute.type.properties)
+        super(UMLAggregation, self).__init__(whole, part)
+
+    @property
+    def full_role(self):
+        return "{self.visibility}{self.role}".format(self=self)
+
+    @property
+    def shared(self):
+        return not self.composite
+
+    @property
+    def part(self):
+        return self.destination
+
+    @part.setter
+    def part(self, part_class):
+        self.destination = part_class
+
+    @property
+    def whole(self):
+        return self.source
+
+    @whole.setter
+    def whole(self, whole_class):
+        self.source = whole_class
+
+    def __str__(self):
+        return "{self.whole.name}<>-[{self.full_role}]-{self.destination.name}".format(self=self)
 
 ######################################################################
 

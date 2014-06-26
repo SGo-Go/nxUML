@@ -9,12 +9,25 @@
   <xsl:template match="/class">
     <table border="0" cellborder="1" cellspacing="0" 
 	   cellpadding = "4"
-	   bgcolor = "lightgray">
+	   bgcolor = "lightgray:white">
       <xsl:attribute name="href">
 	<xsl:value-of select="@location" />
       </xsl:attribute>
+      <xsl:if test="./@fillcolor != ''">
+	<xsl:attribute name="bgcolor">
+	  <xsl:value-of select="@fillcolor" />
+	</xsl:attribute>
+      </xsl:if>
+      <xsl:if test="./@framecolor != ''">
+	<xsl:attribute name="color">
+	  <xsl:value-of select="./@framecolor" />
+	</xsl:attribute>
+      </xsl:if>
+      <xsl:attribute name="tooltip">
+	<xsl:value-of select="@package"/>.<xsl:value-of select="text()" />
+      </xsl:attribute>TOOLTIP
       <tr><td><xsl:if test="./modifiers != ''">
-	<font face="Arial" point-size = "12"><xsl:value-of select="modifiers"/></font><br/>
+	<font face="Arial" point-size = "12">&#x00AB;<xsl:value-of select="modifiers"/>&#x00BB;</font><br/>
       </xsl:if>
       <xsl:if test="./@detalization-level > 3">
       [<xsl:value-of select="@package"/>]</xsl:if>
@@ -62,8 +75,10 @@
   </xsl:template>
 
   <xsl:template match="class/attributes/attribute">
-    <xsl:value-of select="@visibility"/><xsl:value-of select="text()"/><xsl:apply-templates select="type"/>
-    <br align="left"/>
+    <xsl:if test="not(./@unfolding-level &gt;= ../../@detalization-level)">
+      <xsl:value-of select="@visibility"/><xsl:value-of select="text()"/><xsl:apply-templates select="type"/>
+      <br align="left"/>
+    </xsl:if>
   </xsl:template>
 
 
@@ -99,8 +114,20 @@
   </xsl:template>
 
   <xsl:template match="class/methods/method">
-    <xsl:call-template name="class-method.basic"/>
-    <br align="left"/>
+    <xsl:comment>
+    <xsl:if test="../../../@detalization-level > 1">
+      <xsl:call-template name="class-method.basic"/>
+      <br align="left"/>
+    </xsl:if>
+    and text() != '&lt;&lt;destroy&gt;&gt;'
+    </xsl:comment>
+    <xsl:if test="not(../../@detalization-level &lt; 3 and 
+		  (@visibility='- ' 
+		  or text()='&lt;&lt;destroy&gt;&gt;' 
+		  or text()='&lt;&lt;create&gt;&gt;'))">
+      <xsl:call-template name="class-method.basic"/>
+      <br align="left"/>
+    </xsl:if>
   </xsl:template>
 
 </xsl:stylesheet>

@@ -184,7 +184,9 @@ class CppTextParser(object):
         except CppHeaderParser.CppParseError as e: raise e
 
         for className in cppHeader.classes:
-            cls.handle_class(uml_pool, location = cppHeader.headerFileName, **cppHeader.classes[className])
+            cls.handle_class(uml_pool, 
+                             location = cls.location2url(cppHeader.headerFileName), 
+                             **cppHeader.classes[className])
 
         del cppHeader
         return uml_pool
@@ -289,3 +291,11 @@ class CppTextParser(object):
     def handle_generalization(cls, uml_pool, **kwargs):
         uml_generalization = cls.create_generalization(**kwargs)
         uml_pool.add_relationship(uml_generalization)
+
+    @classmethod
+    def location2url(cls, localpath):
+        import urlparse, urllib
+        url = urlparse.urljoin('file:', urllib.pathname2url(localpath))
+        # url = "file://localhost/" + filename.replace("\\", "/")
+        # url = urlparse.urlunparse(urlparse.urlparse(filename)._replace(scheme='file'))
+        return url
