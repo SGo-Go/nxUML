@@ -127,13 +127,13 @@ class UMLType(object):
     @property
     def full_name(self):
         if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return self._scope + "::" + self.name
+            return self._scope + "." + self.name
         else: return self.name
 
     @property
     def scope(self):
         if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return self._scope + "::"
+            return self._scope #+ "."
         else: return ''
 
     @property
@@ -189,11 +189,11 @@ class UMLClass(object):
 
         # Extract dependencies between 
         self.parent    = parent
-        self.provides  = []
-        self.requires  = []
+        self.realizations = []
+        self.usages       = []
         # self.associations = []
         # self.aggregations = []
-        self.compositions = []
+        # self.compositions = []
 
     def add_attribute(self, attrib):
         self.attributes.append(attrib)
@@ -212,6 +212,12 @@ class UMLClass(object):
             self.methods = methods
         else: self.methods.extend(methods)
 
+    def add_realization(self, iface_id):
+        self.realizations.append(iface_id)
+
+    def add_usage(self, iface_id):
+        self.usages.append(iface_id)
+
     @property
     def id(self):
         return self.name
@@ -219,7 +225,7 @@ class UMLClass(object):
     @property
     def full_name(self):
         if self.__dict__.has_key('package') and self.package is not None: 
-            return self.package + "::" + self.name
+            return self.package + "." + self.name
         else: return self.name
 
     @property
@@ -404,6 +410,37 @@ class UMLClassMethod:
         #     xmlRetType      = rtnType.toXML(xmlMethod)
         return xmlMethod
 
+class UMLInterface(object):
+    def __init__(self, name, 
+                 scope    = None,
+                 stereotypes = [],):
+        # Extract data
+        self.name     = str(name)
+        self.scope    = scope
+        self.stereotypes = stereotypes
+
+    @property
+    def id(self):
+        return self.name
+
+    def __str__(self):
+        return r'{stereotypes}{self.scope}.{self.name}'.\
+            format(self=self,
+                   stereotypes = "<<%s>>"%",".join(self.stereotypes),)
+
+# class UMLRealizationPort:
+#     def __init__(self, interface):
+#         self.name       = str(name)
+#         self.stereotypes= stereotypes
+
+# class UMLUsagePort:
+#     def __init__(self, name, 
+#                  stereotypes = [],
+#                  provider = None):
+#         self.name       = str(name)
+#         self.stereotypes= stereotypes
+#         self.provider   = None
+
 ######################################################################
 # Relationships
 ######################################################################
@@ -428,12 +465,28 @@ class UMLNaryRelationship(UMLRelationship):
         return "{{{0}}}".format(
             ','.join(map(lambda x: x.name, self.classifiers)))
 
+
+######################################################################
+class UMLRealization(UMLBinaryRelationship):
+    def __init__(self, cls, iface):
+        super(UMLRealization, self).__init__(iface, cls)
+
+    def __str__(self):
+        return "{self.source.name}-(){self.destination.name}".format(self=self)
+
+class UMLUsage(UMLBinaryRelationship):
+    def __init__(self, iface, cls):
+        super(UMLUsage, self).__init__(cls, iface)
+
+    def __str__(self):
+        return "{self.source.name})-{self.destination.name}".format(self=self)
+
 ######################################################################
 
 class UMLBinaryAssociation(UMLBinaryRelationship):
     def __init__(self, classifier1, classifier2, order_reading = None):
         self.order_reading = order_reading
-        super(UMLAssociation, self).__init__(classifier1, classifier2)
+        super(UMLBinaryAssociation, self).__init__(classifier1, classifier2)
 
     def __str__(self):
         return "{self.source.name}-{order_reading}-{self.destination.name}".\
@@ -444,7 +497,7 @@ class UMLBinaryAssociation(UMLBinaryRelationship):
 class UMLNaryAssociation(UMLNaryRelationship):
     def __init__(self, classifiers, note = None):
         self.note = note
-        super(UMLAssociation, self).__init__(classifier1, classifier2)
+        super(UMLNaryRelationship, self).__init__(classifier1, classifier2)
 
     def __str__(self):
         return "[{self.note}]{out}".format(\
@@ -453,9 +506,10 @@ class UMLNaryAssociation(UMLNaryRelationship):
 ######################################################################
 
 class UMLDetalization(UMLBinaryRelationship):
-    def __init__(self, multiplicity = '', properties = []):
+    def __init__(self, multiplicity = '', properties = [], qualifier = None):
         self.multiplicity = multiplicity
         self.properties   = properties
+        #self.qualifier    = qualifier
 
 class UMLAggregation(UMLBinaryRelationship):
     def __init__(self, whole, part, attribute = None, visibility = '  '):
@@ -463,14 +517,25 @@ class UMLAggregation(UMLBinaryRelationship):
             self.visibility = attribute.visibility
             self.role = attribute.name
             self.composite = attribute.type.composite
+            self.qualifier = attribute.type.qualifier
+            properties   = attribute.type.properties
+            if len(self.qualifier) > 0:
+                multiplicity =  '*'
+                if attribute.type.reference:
+                    properties = ['&'] + properties
+                elif attribute.type.pointer:
+                    properties = ['*'] + properties
+            else:
+                multiplicity = attribute.type.multiplicity
             self.part_detalization = UMLDetalization(
-                multiplicity = attribute.type.multiplicity,
-                properties   = attribute.type.properties)
+                multiplicity = multiplicity, 
+                #, qualifier = qualifier
+                properties = properties)
         super(UMLAggregation, self).__init__(whole, part)
 
     @property
     def full_role(self):
-        return "{self.visibility}{self.role}".format(self=self)
+        return "{self.visibility}{self.role}\n{self.qualifier}".format(self=self)
 
     @property
     def shared(self):
@@ -532,10 +597,14 @@ class UMLPool(object):
         Constructor 
         """
         self.Class           = {}
+        self.Interface       = {}
         self._relationships  = []
 
     def add_class(self, uml_class):
-        self.Class[uml_class.name] = uml_class
+        self.Class[uml_class.id] = uml_class
+
+    def add_interface(self, uml_iface):
+        self.Interface[uml_iface.id] = uml_iface
 
     def add_relationship(self, uml_relationship):
         self._relationships.append(uml_relationship)

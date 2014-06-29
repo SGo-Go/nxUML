@@ -23,6 +23,7 @@ from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLType
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
+from nxUML.core import UMLInterface
 
 import re 
 
@@ -185,7 +186,7 @@ class CppTextParser(object):
 
         for className in cppHeader.classes:
             cls.handle_class(uml_pool, 
-                             location = cls.location2url(cppHeader.headerFileName), 
+                             location = cppHeader.headerFileName, 
                              **cppHeader.classes[className])
 
         del cppHeader
@@ -193,11 +194,11 @@ class CppTextParser(object):
 
 
     @classmethod
-    def create_class(cls, **data):
+    def create_class(cls, uml_pool, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
                              package   = str(data['namespace']).replace('::', '.'),
-                             location  = data['location'],
+                             location  = cls.location2url(data['location']),
                              methods   = [],
                              attribs   = [],
                              modifiers = [],
@@ -213,6 +214,32 @@ class CppTextParser(object):
         for visibility in cls.visibility_types.keys():
             for method in data['methods'][visibility]:
                 cls.handle_method(uml_class, visibility = visibility, **method)
+
+
+        # Work around class typedefs 
+        # @TODO improve performance 
+        # Reason: so far the code below is just a dirty hack 
+        #         covering lack of typedef parsing in CppHeaderParser
+        reTypedef = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
+        with open (data['location'], "r") as myfile:
+            strFile = myfile.read().replace('\n', ' ')
+            for visibility in cls.visibility_types.keys():
+                for typedef in data['typedefs'][visibility]:
+                    # fix for "dirty" typedef name representation in CppHeaderParser 
+                    # if type-name follows closing template parameters without spacing
+                    if typedef[0] == '>': typedef = typedef[1:] 
+
+                    m = re.search(reTypedef.format(typedef), strFile)
+                    if m is not None:
+                        cls.handle_typedef(uml_pool, uml_class, name = typedef, 
+                                           type = m.group(2),
+                                           visibility = visibility,)
+                    else: 
+                        raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
+            del strFile
+
+
+
 
         return uml_class
     
@@ -276,8 +303,13 @@ class CppTextParser(object):
         uml_class.add_method(uml_method)
 
     @classmethod
+    def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
+        pass #print name, visibility
+        # cls.handle_method(uml_class, visibility = visibility, **method)
+
+    @classmethod
     def handle_class(cls, uml_pool, **data):
-        uml_class = cls.create_class(**data)
+        uml_class = cls.create_class(uml_pool, **data)
         uml_pool.add_class(uml_class)
 
         # Work around inheritances of class

@@ -38,7 +38,8 @@ sys.path.pop(0)
 
 packages=["nxUML",
           "nxUML.parser",
-          "nxUML.core",]
+          "nxUML.core",
+          "nxUML.drawing",]
 
 docdirbase = 'share/doc/doxyuml-%s' % version
 # add basic documentation

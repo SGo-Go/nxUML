@@ -34,7 +34,7 @@ class AGraphWriter(object):
                 'default'   : {'style' : 'filled', 
                                'fillcolor' : 'gray',  'shape' : 'box'},
                 },
-            'interface' : {'fontsize' : 10, 
+            'interface' : {'fontsize' : 10,
                            'fontcolor' : 'black', 'shape' : 'plaintext'}
             },
         "edge" : {
@@ -50,15 +50,27 @@ class AGraphWriter(object):
         }
 
     default_styles = {
+        "node" : {
+            'class'     : {
+                'default'   : {'style' : 'filled', 
+                               'fillcolor' : 'gray',  'shape' : 'box'},
+                },
+            'interface' : {'fontsize' : 12, #'font' 
+                           'fontcolor' : 'black', 'shape' : 'plaintext'}
+            },
         "edge" : {
-            UMLGeneralization : {'style' : 'dashed', 'dir' : 'back', 
-                                 'arrowtail' : 'empty', 'arrowhead' : 'none'},
-            UMLAggregation : {'style' : 'solid', 'dir' : 'back', 
-                              'arrowtail' : 'diamond', 'arrowhead' : 'none'},
-            "require"  : {"dir" : "forward", 
-                          "arrowtail" : "empty", "arrowhead" : "tee"},
-            "provide"  : {"dir" : "both", 
-                          "arrowtail" : "odot",  "arrowhead" : "none"}
+            UMLGeneralization   : {'style' : 'dashed', 'dir' : 'back', 
+                                   'arrowtail' : 'empty', 'arrowhead' : 'none',
+                                   'fontsize' : 12},
+            UMLAggregation      : {'style' : 'solid', 'dir' : 'back', 
+                                   'arrowtail' : 'diamond', 'arrowhead' : 'none',
+                                   'fontsize' : 12},
+            UMLUsage            : {'style' : 'solid', "dir" : "forward", 
+                                   "arrowtail" : "none", "arrowhead" : "tee",
+                                   'fontsize' : 12},
+            UMLRealization      : {'style' : 'solid', "dir" : "both", 
+                                   "arrowtail" : "odot",  "arrowhead" : "none",
+                                   'fontsize' : 12}
             }
         }
 
@@ -98,8 +110,11 @@ class UMLAGraph(MultiDiGraph):
         self.transform = etree.XSLT(xslt)
 
         xmlDiag = self.uml_diag.toXML()
-        for uml_class in self.uml_diag:
+        for uml_class in self.uml_diag._classes.keys(): #self.uml_diag:
             self.add_class(uml_class, xmlDiag)
+
+        for group_id in xrange(len(self.uml_diag.interface_groups)): #self.uml_diag:
+            self.add_interface_group(group_id, xmlDiag)
 
         for classFrom, classTo, data in self.uml_diag.edges_iter(data=True):
             uml_rel = data['data']
@@ -121,6 +136,21 @@ class UMLAGraph(MultiDiGraph):
                 label = "<\n%s>" % etree.tostring(xmlLabel, pretty_print=True)
                 del rawXmlClass, xmlLabel
                 self.add_node(name, label = label, shape="plaintext")
+        return name
+
+    def add_interface_group(self, name, xmlDiag):
+        """
+        Append node for the class involved in brownie interactions to the graph.
+        Convert UML class to a dictionary with node settings for graphviz
+        @param uml_class   UML class to convert
+        """
+        if name is not None: 
+            if not self.has_node(name): 
+                from lxml import etree
+                uml_igroup = self.uml_diag.interface_groups[name]
+                label = str(uml_igroup)
+                styles = self.styles['node']['interface']
+                self.add_node(name, label = label, **styles)
         return name
 
     def add_relationship(self, uml_relationship):
