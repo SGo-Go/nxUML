@@ -85,6 +85,10 @@ class CppTypeParser(object):
                                          format(reSpecifier=r"|".join(cpp_specifiers.keys())))
 
     @classmethod
+    def cname2umlId(cls, name):
+        return name.replace('::', '.')
+
+    @classmethod
     def parse(cls, strType):
         parsedType, ptr, delim = cls.parse_from_pointer(str(strType), 0)
         if len(strType) > ptr: 
@@ -185,9 +189,16 @@ class CppTextParser(object):
         except CppHeaderParser.CppParseError as e: raise e
 
         for className in cppHeader.classes:
-            cls.handle_class(uml_pool, 
-                             location = cppHeader.headerFileName, 
-                             **cppHeader.classes[className])
+            classData = cppHeader.classes[className]
+            if classData['parent'] is None:
+                subclasses = dict([(name,data) \
+                                       for name, data in cppHeader.classes.items() \
+                                       if data['parent'] == className])
+                cls.handle_class(uml_pool, 
+                                 location = cppHeader.headerFileName, 
+                                 subclasses  = subclasses,
+                                 **cppHeader.classes[className])
+                del subclasses
 
         del cppHeader
         return uml_pool
@@ -237,8 +248,6 @@ class CppTextParser(object):
                     else: 
                         raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
             del strFile
-
-
 
 
         return uml_class
@@ -304,13 +313,21 @@ class CppTextParser(object):
 
     @classmethod
     def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
-        pass #print name, visibility
-        # cls.handle_method(uml_class, visibility = visibility, **method)
+        pass
+
+    @classmethod
+    def handle_subclass(cls, uml_pool, **data):
+        cls.handle_class(uml_pool, **data)
 
     @classmethod
     def handle_class(cls, uml_pool, **data):
         uml_class = cls.create_class(uml_pool, **data)
         uml_pool.add_class(uml_class)
+
+        # Work around subclasses
+        if data.has_key('subclasses') and len(data['subclasses']) > 0:
+            for className, classData in data['subclasses'].items():
+                cls.handle_subclass(uml_pool, location = data['location'], **classData)
 
         # Work around inheritances of class
         for gener_link in data['inherits']:

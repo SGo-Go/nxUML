@@ -176,9 +176,10 @@ class UMLClass(object):
                  package  = None,
                  methods  = [],
                  attribs  = [],
-                 modifiers = [],
+                 modifiers  = [],
+                 subclasses = [],
                  parent   = None,):
-        # Extract data
+        # Fill data
         self.name       = str(name)
         self.package    = package
         self.location   = location
@@ -187,13 +188,15 @@ class UMLClass(object):
         self.methods    = methods
         self.attributes = attribs
 
-        # Extract dependencies between 
-        self.parent    = parent
+        # Fill dependencies 
+        self.parent       = parent
+        self.subclasses   = []
+
         self.realizations = []
         self.usages       = []
-        # self.associations = []
-        # self.aggregations = []
-        # self.compositions = []
+
+    def add_subclass(self, name):
+        self.subclasses.append(name)
 
     def add_attribute(self, attrib):
         self.attributes.append(attrib)
@@ -270,6 +273,13 @@ class UMLClass(object):
                    attributes = "\n".join(map(str,self.attributes)),
                    methods    = "\n".join(map(str,self.methods)),
                    modifiers  = "" if len(modifiers) == 0 else "<<%s>>"%",".join(modifiers))
+
+    def methods_iter(self, visibility = '+'):
+        """Iterate over the methods
+        """
+        for uml_method in self.methods:
+            if uml_method.visibility[0] == visibility:
+                yield (uml_method)
 
     def toXML(self, root = None):
         from lxml import etree

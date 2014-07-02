@@ -27,12 +27,23 @@ class UMLBrownieInterface(UMLInterface):
         super(UMLBrownieInterface, self).__init__(name, scope, stereotypes)
 
     @classmethod
-    def make_id(self, name, scope, stereotypes):
-        return name if scope is None else scope + '.' + name
+    def make_id(self, name, scope, stereotype):
+        return "[{0}]{1}".format(stereotype[0], 
+                                name if scope is None else scope + '.' + name)
 
     @property
     def id(self):
-        return self.make_id(self.name, self.scope, self.stereotypes)
+        return self.make_id(self.name, self.scope, self.stereotypes[0])
+
+    @property
+    def parent(self):
+        return self.scope
+
+    def has_parent(self, parent):
+        return self.scope == parent
+
+    def use_type(self, name, scope):
+        return self.scope == scope
 
     def __str__(self):
         stereotype = self.stereotypes[0]
@@ -56,12 +67,37 @@ class UMLBrownieCall(UMLBrownieInterface):
         self.result_type   = result_type
         self.error_type    = error_type
         self.value_type    = value_type
-        super(UMLBrownieInterface, self).__init__(name, scope, stereotypes)
+        super(UMLBrownieCall, self).__init__(name, scope, stereotypes)
+
+    def use_type(self, name, scope):
+        return self.scope == scope and \
+            name in (self.argument_type, self.result_type, self.error_type, self.value_type)
 
     def __str__(self):
         stereotype = self.stereotypes[0]
         name = self.name[:-len(stereotype)]
         return "<<{stereotype}>>{name}({self.argument_type}):{self.result_type}/err:{self.error_type}/".\
+            format(self=self, 
+                   stereotype = stereotype, name = name)
+
+
+class UMLBrownieNotification(UMLBrownieInterface):
+    def __init__(self, name, 
+                 scope         = None,
+                 stereotypes   = [],
+                 value_type    = None,
+                 **kwargs):
+        self.value_type    = value_type
+        super(UMLBrownieNotification, self).__init__(name, scope, stereotypes)
+
+    def use_type(self, name, scope):
+        return self.scope == scope and \
+            name in (self.value_type,)
+
+    def __str__(self):
+        stereotype = self.stereotypes[0]
+        name = self.name[:-len(stereotype)]
+        return "<<{stereotype}>>{name}:{self.value_type}".\
             format(self=self, 
                    stereotype = stereotype, name = name)
 
@@ -111,9 +147,20 @@ class BrownieTextParser(CppTextParser):
             super(BrownieTextParser,cls).handle_method(uml_class, **kwargs)
 
     @classmethod
-    def handle_class(cls, uml_pool, **kwargs):
-        if kwargs['parent'] is None:
-            super(BrownieTextParser,cls).handle_class(uml_pool, **kwargs)
+    def handle_subclass(cls, uml_pool, **data):
+        for iface in uml_pool.Interface.values():
+            if iface.use_type(data['name'], data['parent']):
+                # print iface.id, data['name']
+
+                # print '*', 
+                # attribs = []
+                # for visibility in cls.visibility_types.keys():
+                #     attribs.extend([(param['name'], param['type']) for param in data['properties'][visibility]])
+                #print ','.join(map(lambda attrib: "%s:%s" % (attrib[0],attrib[0]), attribs))
+                return None
+            
+        #uml_pool.Class[cls.TypeParser.cname2umlId(data['parent'])].add_subclass(data['name'])
+        uml_pool.Class[data['parent']].add_subclass(data['name'])
 
     @classmethod
     def handle_generalization(cls, uml_pool, **kwargs):
@@ -130,7 +177,6 @@ class BrownieTextParser(CppTextParser):
     @classmethod
     def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
         if kwargs['visibility'] == 'public' and isinstance(uml_holder, UMLClass):
-            # print kwargs['name'], kwargs['visibility']
             uml_type = cls.TypeParser.parse(kwargs['type'])
             if uml_type.name in ('ConcreteNotification', 'ConcreteOperationCall'):
                 if len(uml_type.parameters) > 1:
@@ -184,9 +230,10 @@ class BrownieTextParser(CppTextParser):
             uml_iface = UMLBrownieCall(name, scope = scope, stereotypes = (stereotype,),
                                        **kwargs)
         else:
-            uml_iface = UMLBrownieInterface(name, 
-                                            scope = scope,
-                                            stereotypes = (stereotype,))
+            uml_iface = UMLBrownieNotification(name, 
+                                               scope = scope,
+                                               stereotypes = (stereotype,),
+                                               **kwargs)
         return uml_iface
         
 
@@ -195,12 +242,10 @@ class BrownieTextParser(CppTextParser):
         uml_iface = cls.create_brownie_interface(scope = uml_class.id, **kwargs)
         uml_pool.add_interface(uml_iface)
         uml_realization = uml_iface.id
-        # print uml_class.id, uml_realization, uml_iface
         uml_class.add_realization(uml_realization)
 
     @classmethod
     def handle_brownie_usage(cls, uml_pool, uml_class, **kwargs):
         uml_usage = UMLBrownieInterface.make_id(kwargs['name'], kwargs['provider'], kwargs['stereotype'])
-        # print uml_class.id, uml_usage
         uml_class.add_usage(uml_usage)
 

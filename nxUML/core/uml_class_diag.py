@@ -44,6 +44,7 @@ class UMLClassDiagram(MultiDiGraph):
                  group_interfaces     = True,
                  with_associations    = False,
                  auto_aggregation     = False,
+                 forced_relationships = False,
                  # max_label = 4, name2URL = None,
                  data=None, #file=None,
                  **attr):
@@ -69,7 +70,8 @@ class UMLClassDiagram(MultiDiGraph):
                             with_interfaces      = with_interfaces,
                             group_interfaces     = group_interfaces,
                             with_associations    = with_associations,
-                            auto_aggregation     = auto_aggregation,)
+                            auto_aggregation     = auto_aggregation,
+                            forced_relationships = forced_relationships)
 
     def add_clases(self, uml_pool, classes, 
                    detalization_level = 0,
@@ -78,7 +80,9 @@ class UMLClassDiagram(MultiDiGraph):
                    with_interfaces      = True,
                    group_interfaces     = True,
                    with_associations    = False,
-                   auto_aggregation     = False):
+                   auto_aggregation     = False,
+                   forced_relationships = False,
+                   ):
         """
         @param level       detalization level
         |     level     | Description                   |
@@ -97,7 +101,7 @@ class UMLClassDiagram(MultiDiGraph):
 
         if with_generalizations and uml_pool:
             for uml_relationship in uml_pool.generalizations_iter():
-                self.add_relationship(uml_relationship)
+                self.add_relationship(uml_relationship, forced_relationships)
 
         if with_associations: pass
 
