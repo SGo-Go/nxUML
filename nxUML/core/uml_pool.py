@@ -15,25 +15,46 @@ stored as networkx graph object.
 """
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
-from nxUML.core.uml_class_primitives   import UMLClass, UMLInterface, UMLType
-from nxUML.core.uml_class_relatioships import *
+from nxUML.core.uml_class_primitives    import UMLClass, UMLInterface, UMLType
+from nxUML.core.uml_class_relationships import *
+from nxUML.core.uml_artifacts           import *
+
+class UMLDeploymentPool(object):
+    def __init__(self, name='', 
+                 sources = None,
+                 source_prefix = '',
+                 **attr):
+        if sources is None:
+            self.sources = UMLSourceFilesGraph(source_prefix)
+        else: self.sources = sources
+
+    def source(self, sourceId):
+        return self.sources.source[sourceId]
 
 class UMLPool(object):
+    """Pool of classes with relationships between them
     """
-    Pool of classes with relationships between them
-    """
-    def __init__(self, data=None, name='', file=None, **attr):
-        """
-        Constructor 
+    def __init__(self, name='', 
+                 deployment = None, 
+                 deployment_class = UMLDeploymentPool, source_prefix = '',
+                 **attr):
+        """Constructor 
         """
         self.Class           = {}
         self.Interface       = {}
         self._relationships  = []
 
+        if deployment is None: 
+            self.deployment = deployment_class(source_prefix = source_prefix)
+        else: self.deployment = deployment
+
     def add_class(self, uml_class):
         self.Class[uml_class.id] = uml_class
 
     def add_interface(self, uml_iface):
+        self.Interface[uml_iface.id] = uml_iface
+
+    def add_file(self, uml_iface):
         self.Interface[uml_iface.id] = uml_iface
 
     def add_relationship(self, uml_relationship):

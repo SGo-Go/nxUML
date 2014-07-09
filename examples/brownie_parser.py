@@ -123,8 +123,8 @@ class BrownieTextParser(CppTextParser):
         }
 
     @classmethod
-    def parse(cls, filename, uml_pool = None):
-        return super(BrownieTextParser,cls).parse(filename, uml_pool)
+    def parse(cls, filename, uml_pool = None, **kwargs):
+        return super(BrownieTextParser,cls).parse(filename, uml_pool, **kwargs)
 
     @classmethod
     def handle_attribute(cls, uml_class, **kwargs):
@@ -137,7 +137,16 @@ class BrownieTextParser(CppTextParser):
                     'onDenotification',
                     'onErrorStatus',
                     'handleDenotification',
-                    'handleNotification'): 
+                    'handleNotification',
+                    'onStatus',
+                    ): 
+            pass
+        elif name in (
+                      'handleSessionNotification',
+                      'handleNotificationStatus',
+                      ): 
+            # if 'ServiceCallable' in uml_class.modifiers:
+            #     print uml_class.name, name
             pass
         elif name in ('handleCall',
                       'onError',
@@ -163,20 +172,17 @@ class BrownieTextParser(CppTextParser):
         uml_pool.Class[data['parent']].add_subclass(data['name'])
 
     @classmethod
-    def handle_generalization(cls, uml_pool, **kwargs):
-        parent = cls.TypeParser.parse(kwargs['parent'])
-        child  = cls.TypeParser.parse(kwargs['child'])
+    def handle_generalization(cls, uml_pool, parent, child, **kwargs):
         if parent.name == child.name:
             for prop in ('ServiceCallable', 'LocalCallable', 'LocalCallback'):
                 if prop in parent.properties: 
-                    uml_pool.Class[child.name].add_modifier(prop)
+                    child.add_modifier(prop)
         else:
-            super(BrownieTextParser,cls).handle_generalization(uml_pool,**kwargs)
-        del parent, child
+            super(BrownieTextParser,cls).handle_generalization(uml_pool, parent, child,**kwargs)
 
     @classmethod
     def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
-        if kwargs['visibility'] == 'public' and isinstance(uml_holder, UMLClass):
+        if isinstance(uml_holder, UMLClass): #kwargs['visibility'] == 'public' and 
             uml_type = cls.TypeParser.parse(kwargs['type'])
             if uml_type.name in ('ConcreteNotification', 'ConcreteOperationCall'):
                 if len(uml_type.parameters) > 1:

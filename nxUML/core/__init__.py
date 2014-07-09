@@ -14,11 +14,11 @@ Init-file for folder with core nxUML classes.
 """
 
 from nxUML.core.uml_class_primitives   import *
-from nxUML.core.uml_class_relatioships import *
+from nxUML.core.uml_class_relationships import *
 from nxUML.core.uml_artifacts import *
 from nxUML.core.uml_pool import *
 
-from nxUML.core.uml_class_diag import UMLClassDiagram
+from nxUML.core.uml_class_diag import UMLClassDiagram, UMLClassRelationsGraph
 
 # try:
 #     from nxUML.core.uml_class_diag import UMLClassDiagram

@@ -24,8 +24,9 @@ from nxUML.core import UMLQualifier, UMLType
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
+from nxUML.core import UMLSourceFile
 
-import re 
+import re, os, math
 
 def debug(*args):
     print(args)
@@ -63,15 +64,23 @@ class CppTypeParser(object):
         'unordered_multimap': 'map',
         'THBMap'    : 'THBMap',
         }
+
+    builtin_functions = {
+        "std::sin"      : math.sin,
+        "std::sqrt"     : math.sqrt,
+        }# eval(str,{"__builtins__":None},builtin_functions)
+
     specifier_types = {}
 
     cpp_specifiers = {
         'const'  : 'readOnly',
         'static' : None,
-        'mutual' : 'mutable'
+        'mutable': 'mutable'
         }
 
     reId        = r"[a-zA-Z_][a-zA-Z0-9_]*"
+    reNumeric   = r"(0x[0-9a-fA-F]+|0[0-7]+|[-+]?\d*\.?\d+([eE][-+]?\d+)?)"
+    reString    = r'\"([^"]|\\")*\"'
     reScope     = r"({reId}::)*".format(reId=reId)
     reDelimiter = r"<|>|,"
     reRefPtr    = r"(const)?\s*(\*|&)"
@@ -83,6 +92,10 @@ class CppTypeParser(object):
                                          format(reScope=reScope, reId=reId, reDelimiter=reDelimiter))
     reFindSpecifier     = re.compile(r"^\s*({reSpecifier})\s".\
                                          format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    reFindConstSuffix   = re.compile(r"^\s*const\s*".\
+                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    reFindValue         = re.compile(r"^\s*({reNumeric}|{reString})\s*".\
+                                         format(reNumeric = reNumeric, reString = reString))
 
     @classmethod
     def cname2umlId(cls, name):
@@ -92,7 +105,7 @@ class CppTypeParser(object):
     def parse(cls, strType):
         parsedType, ptr, delim = cls.parse_from_pointer(str(strType), 0)
         if len(strType) > ptr: 
-            raise ValueError('Type parsing error: check "%s" at [%s]' % (strType[ptr:], ptr))
+            raise ValueError('Type parsing error: check "%s" at [%s]' % (strType, ptr))
         #debug('"%s"' %delim)
         return parsedType
 
@@ -111,13 +124,20 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
         del m
 
+        m = cls.reFindValue.search(strType[currPointer:]) # @TODO
+        if m is not None: print eval(m.group(0))
+        
         m = cls.reFindPrimitive.search(strType[currPointer:])
-        currPointer += len(m.group(0))
-        name, scope = m.group(3), m.group(1)
-        if(len(scope) > 0): scope = scope[:-2].replace('::', '.')
-        del m
+        if m is not None:
+            currPointer += len(m.group(0))
+            name, scope = m.group(3), m.group(1)
+            if(len(scope) > 0): scope = scope[:-2].replace('::', '.')
+            del m
+        else:
+            raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
+
         if name in cls.cpp_specifiers.keys(): 
-            raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename [%s]' % (name, currPointer))
+            raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename "%s" [%s]' % (name, strType, currPointer))
 
         delim = None
 
@@ -131,7 +151,7 @@ class CppTypeParser(object):
                 parsedType, currPointer, delim = cls.parse_from_pointer(strType, currPointer)
                 parameters.append(parsedType)
             if delim != '>' : 
-                raise ValueError('Type parsing error: close parameters list [%s]' % currPointer)
+                raise ValueError('Type parsing error: close parameters list in a typename "%s" [%s]' % (strType, currPointer))
 
             if cls.containers_single_param.has_key(name):
                 #debug('!!!!', parameters[0])
@@ -159,6 +179,11 @@ class CppTypeParser(object):
             if   ptr_type == '&': uml_type.reference    = True
             elif ptr_type == '*': uml_type.pointer      = True
 
+        m = cls.reFindConstSuffix.search(strType[currPointer:])
+        if m is not None:
+            currPointer += len(m.group(0))
+            del m
+
         m = cls.reFindDelimiter.search(strType[currPointer:])
         if m is not None:
             delim = m.group(1)
@@ -173,6 +198,8 @@ class CppTypeParser(object):
 class CppTextParser(object):
     TypeParser = CppTypeParser
 
+    header_ext = ('.hpp', '.hxx', '.h', '.h++')
+
     visibility_types = {
         'private'       : '-', 
         'protected'     : '#', 
@@ -181,12 +208,24 @@ class CppTextParser(object):
 
 
     @classmethod
-    def parse(cls, filename, uml_pool = None):
+    def parse(cls, filename, uml_pool = None, include_paths= []):
         if uml_pool is None: uml_pool = UMLPool()
 
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
+
+        uml_source = cls.create_source_artifact(uml_pool, cppHeader.headerFileName, local = True)
+        uml_pool.deployment.sources.add(uml_source, forced = True)
+        sourceId = uml_source.id
+        
+        source_folder = os.path.join(uml_pool.deployment.sources.source_prefix, 
+                                     uml_source.folder)
+
+        all_include_paths = [source_folder] + list(include_paths)
+        for sourceFile in cppHeader.includes:
+            cls.handle_include(uml_pool, sourceId = sourceId, include_name=sourceFile, 
+                               include_paths = all_include_paths)
 
         for className in cppHeader.classes:
             classData = cppHeader.classes[className]
@@ -195,7 +234,7 @@ class CppTextParser(object):
                                        for name, data in cppHeader.classes.items() \
                                        if data['parent'] == className])
                 cls.handle_class(uml_pool, 
-                                 location = cppHeader.headerFileName, 
+                                 location = sourceId,
                                  subclasses  = subclasses,
                                  **cppHeader.classes[className])
                 del subclasses
@@ -203,18 +242,36 @@ class CppTextParser(object):
         del cppHeader
         return uml_pool
 
-
     @classmethod
     def create_class(cls, uml_pool, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
                              package   = str(data['namespace']).replace('::', '.'),
-                             location  = cls.location2url(data['location']),
+                             location  = data['location'], #cls.location2url(data['location']), @TODO url 
                              methods   = [],
                              attribs   = [],
                              modifiers = [],
                              parent    = data['parent'],)
         #debug('!!!', uml_class.__dict__)
+
+        # Work around inheritances of class
+        # Caution: it includes hack for improper 
+        #        handling of templated inheritances in CppHeaderParser
+        new_generalization  = True
+        for gener_link in data['inherits']:
+            if new_generalization:
+                parent_name = ''
+                gener_link_data = gener_link
+                new_generalization = False
+                pass
+            parent_name += (',' if len(parent_name) > 0 and \
+                                gener_link['class'] != '>' else '') + gener_link['class']
+            if parent_name.count('<') == parent_name.count('>'):
+                new_generalization = True
+                cls.handle_generalization(uml_pool, 
+                                          parent = cls.TypeParser.parse(parent_name), 
+                                          child  = uml_class,
+                                          **gener_link_data)
 
         # Work around class attributes
         for visibility in cls.visibility_types.keys():
@@ -226,13 +283,22 @@ class CppTextParser(object):
             for method in data['methods'][visibility]:
                 cls.handle_method(uml_class, visibility = visibility, **method)
 
+        
+        # Register parsed class as a component of source
+        uml_source = uml_pool.deployment.source(uml_class.location)
+        if uml_source.__dict__.has_key('classes'):
+            uml_source.classes.append(uml_class.id)
+        else: uml_source.classes = [uml_class.id]
+
 
         # Work around class typedefs 
         # @TODO improve performance 
         # Reason: so far the code below is just a dirty hack 
         #         covering lack of typedef parsing in CppHeaderParser
         reTypedef = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
-        with open (data['location'], "r") as myfile:
+
+        filename = uml_pool.deployment.sources.abspath(data['location'])
+        with open (filename, "r") as myfile:
             strFile = myfile.read().replace('\n', ' ')
             for visibility in cls.visibility_types.keys():
                 for typedef in data['typedefs'][visibility]:
@@ -293,11 +359,11 @@ class CppTextParser(object):
         return uml_method
 
     @classmethod
-    def create_generalization(cls, **kwargs):
+    def create_generalization(cls, parent, child, **kwargs):
         visibility = cls.visibility_types.get(kwargs['access'], ' ')
         visibility+= '/' if kwargs['virtual'] else ' '
-        uml_generalization = UMLGeneralization(parent  = cls.TypeParser.parse(kwargs['parent']),
-                                               child   = cls.TypeParser.parse(kwargs['child']),
+        uml_generalization = UMLGeneralization(parent  = parent,
+                                               child   = child,
                                                visibility = visibility,)
         return uml_generalization
 
@@ -329,16 +395,10 @@ class CppTextParser(object):
             for className, classData in data['subclasses'].items():
                 cls.handle_subclass(uml_pool, location = data['location'], **classData)
 
-        # Work around inheritances of class
-        for gener_link in data['inherits']:
-            cls.handle_generalization(uml_pool, 
-                                      child = uml_class.full_name.replace('.', '::'), 
-                                      parent = gener_link['class'], 
-                                      **gener_link)
 
     @classmethod
-    def handle_generalization(cls, uml_pool, **kwargs):
-        uml_generalization = cls.create_generalization(**kwargs)
+    def handle_generalization(cls, uml_pool, parent, child, **kwargs):
+        uml_generalization = cls.create_generalization(parent, child, **kwargs)
         uml_pool.add_relationship(uml_generalization)
 
     @classmethod
@@ -348,3 +408,38 @@ class CppTextParser(object):
         # url = "file://localhost/" + filename.replace("\\", "/")
         # url = urlparse.urlunparse(urlparse.urlparse(filename)._replace(scheme='file'))
         return url
+
+    @classmethod
+    def handle_include(cls, uml_pool, sourceId = None, include_name = '""', 
+                       include_paths = [], **data):
+        filename = include_name[1:-1]
+
+        folder = os.path.dirname(filename)
+        name, ext = os.path.splitext(os.path.basename(filename))
+        found = False
+        if include_name[0] == '"' and include_name[-1] == '"':
+            for include_folder in include_paths:
+                full_name = os.path.join(include_folder, filename)
+                if os.path.isfile(full_name):
+                    folder = os.path.dirname(full_name)
+                    found = True
+                    break
+        else:
+            full_name = filename
+            local = False
+
+        uml_source = cls.create_source_artifact(uml_pool, full_name, local = found)
+        uml_pool.deployment.sources.add(uml_source, forced = False)
+        uml_pool.deployment.sources.add_edge(sourceId, uml_source.id)
+        #exit()
+
+
+    @classmethod
+    def create_source_artifact(cls, uml_pool, filename, **data):
+        folder = os.path.dirname(filename)
+        name, ext = os.path.splitext(os.path.basename(filename))
+        uml_source = UMLSourceFile(name, ext=ext, folder=folder,
+                                   stereotype = 'source',
+                                   local = data['local'])
+        uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
+        return uml_source
