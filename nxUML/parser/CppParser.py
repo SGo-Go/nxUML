@@ -65,35 +65,48 @@ class CppTypeParser(object):
         'THBMap'    : 'THBMap',
         }
 
-    builtin_functions = {
-        "std::sin"      : math.sin,
-        "std::sqrt"     : math.sqrt,
-        }# eval(str,{"__builtins__":None},builtin_functions)
+    expression_functions = {
+        "sin"      : math.sin,
+        "sqrt"     : math.sqrt,
+        }
 
     specifier_types = {}
 
     cpp_specifiers = {
-        'const'  : 'readOnly',
-        'static' : None,
-        'mutable': 'mutable'
+        'const'   : 'readOnly',
+        'static'  : None,
+        'mutable' : 'mutable',
+        'volatile': 'volatile',
+        'typename': 'typename',
         }
+
+
+    expr_open_parent   = list(r"<{[(")
+    expr_close_parent  = list(r">}])")
+    close_open_pairing = dict(zip(expr_close_parent, expr_open_parent))
 
     reId        = r"[a-zA-Z_][a-zA-Z0-9_]*"
     reNumeric   = r"(0x[0-9a-fA-F]+|0[0-7]+|[-+]?\d*\.?\d+([eE][-+]?\d+)?)"
     reString    = r'\"([^"]|\\")*\"'
-    reScope     = r"({reId}::)*".format(reId=reId)
+    reScope     = r"({reId}(<.*>)?::)*".format(reId=reId)
     reDelimiter = r"<|>|,"
     reRefPtr    = r"(const)?\s*(\*|&)"
-    reFindPrimitive     = re.compile(r"^\s*({reScope})({reId})\s*".\
-                                         format(reScope=reScope, reId=reId, reDelimiter=reDelimiter))
+
+    # Compiled regexps in use
+    reFindId    = re.compile(r"^\s*({reId})\s*".format(reId=reId))
+    reFindNamespaceSeparator  = re.compile(r"^\s*::\s*")
+    reFindConstSuffix   = re.compile(r"^\s*(const)?\s*".\
+                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
     reFindRefPtr        = re.compile(r"^\s*{reRefPtr}\s*".\
                                          format(reScope=reScope, reId=reId, reRefPtr=reRefPtr))
+    reFindSpecifier     = re.compile(r"^\s*({reSpecifier})\s+".\
+                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+
+    # Deprivated regexps
+    reFindPrimitive     = re.compile(r"^\s*({reScope})({reId})\s*".\
+                                         format(reScope=reScope, reId=reId, reDelimiter=reDelimiter))
     reFindDelimiter     = re.compile(r"^\s*({reDelimiter})\s*".\
                                          format(reScope=reScope, reId=reId, reDelimiter=reDelimiter))
-    reFindSpecifier     = re.compile(r"^\s*({reSpecifier})\s".\
-                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
-    reFindConstSuffix   = re.compile(r"^\s*const\s*".\
-                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
     reFindValue         = re.compile(r"^\s*({reNumeric}|{reString})\s*".\
                                          format(reNumeric = reNumeric, reString = reString))
 
@@ -102,18 +115,73 @@ class CppTypeParser(object):
         return name.replace('::', '.')
 
     @classmethod
+    def eval(cls, expr):
+        """
+        @TODO exclude syntaxis in Python but unavailable in C++
+        E.g. double-star operator for powering
+        """
+        return eval(expr, {"__builtins__":None}, cls.expression_functions)
+
+    @classmethod
+    def is_expression(cls, expr):
+        try: 
+            cls.eval(expr)
+            return True
+        except SyntaxError: return False
+        except: return False
+    
+
+    @classmethod
     def parse(cls, strType):
-        parsedType, ptr, delim = cls.parse_from_pointer(str(strType), 0)
+        parsedType, ptr = cls.parse_from_pointer(str(strType), 0)
         if len(strType) > ptr: 
-            raise ValueError('Type parsing error: check "%s" at [%s]' % (strType, ptr))
+            raise ValueError('Type parsing error: End of type "%s" is expected at [%s]' % (strType, ptr))
         #debug('"%s"' %delim)
         return parsedType
+
+    @classmethod
+    def get_template_parameters(cls, strType, ptr):
+        # Caution: This function fails if parameters list contains expressions with << and >> operators.
+        #         It requires somewhat more sophisticated algorithm for <> parens analysis
+        #         Similarly, if there are escape '\"' in string litrals, it might cause parsing problems
+        # @TODO add safe recognition of  << and >> operators and strings literals
+        params = []
+        if len(strType) > ptr + 1 and strType[ptr] == '<':
+            unclosed_parens = []
+            ptrCurr = ptr+1
+            treat_string_literal = False
+            for i in xrange(ptrCurr, len(strType)):
+                ch = strType[i]
+                if ch == r'"':
+                    treat_string_literal = not treat_string_literal
+                if not treat_string_literal:
+                    if ch in cls.expr_close_parent:
+                        if ch == '>' and len(unclosed_parens) == 0:
+                            params.append(strType[ptrCurr:i])
+                            return i+1, params
+                        if cls.close_open_pairing[ch] != unclosed_parens.pop():
+                            raise ValueError('Type parsing error: unbalances parens in "%s" at [%s]' % (strType, i))
+                    elif ch in cls.expr_open_parent:
+                        unclosed_parens.append(ch)
+                    elif ch == ',' and len(unclosed_parens) == 0:
+                        params.append(strType[ptrCurr:i])
+                        ptrCurr = i+1
+            if treat_string_literal:
+                raise ValueError('Type parsing error: string literal is not closed in "%s" at [%s]' % (strType, i))
+            else:
+                raise ValueError('Type parsing error: close paren for < is not found in "%s" at [%s]' % (strType, i))
+        else: return ptr, None
 
     @classmethod
     def parse_from_pointer(cls, strType, ptr):
         currPointer = ptr
         properties  = []
         parameters  = []
+
+        # Expressions are saved as constrant string literals
+        if cls.is_expression(strType):
+            return strType, len(strType)
+
 
         while True:
             m = cls.reFindSpecifier.search(strType[currPointer:])
@@ -124,40 +192,40 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
         del m
 
-        m = cls.reFindValue.search(strType[currPointer:]) # @TODO
-        if m is not None: print eval(m.group(0))
-        
-        m = cls.reFindPrimitive.search(strType[currPointer:])
-        if m is not None:
-            currPointer += len(m.group(0))
-            name, scope = m.group(3), m.group(1)
-            if(len(scope) > 0): scope = scope[:-2].replace('::', '.')
-            del m
-        else:
-            raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
+        scope = ''
+        while True:
+            m = cls.reFindId.search(strType[currPointer:])
+            if m is not None:
+                currPointer += len(m.group(0))
+                name = m.group(1)
+                del m
+            else:
+                raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
 
-        if name in cls.cpp_specifiers.keys(): 
-            raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename "%s" [%s]' % (name, strType, currPointer))
+            if name in cls.cpp_specifiers.keys(): 
+                raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename "%s" [%s]' % (name, strType, currPointer))
 
-        delim = None
+            currPointer, params = cls.get_template_parameters(strType, currPointer)
 
-        m = cls.reFindDelimiter.search(strType[currPointer:])
-        if m is not None and m.group(1) == '<':
-            delim = m.group(1)
-            currPointer += len(m.group(0))
-            del m
-            delim = ','
-            while delim == ',':
-                parsedType, currPointer, delim = cls.parse_from_pointer(strType, currPointer)
+            m = cls.reFindNamespaceSeparator.search(strType[currPointer:])
+            if m is None: break # part of name, not scope
+            else: 
+                currPointer += len(m.group(0))
+                del m
+                # @TODO here one may add some code for propper namespaces treatment
+                scope += name + '.'
+
+        if params is not None and len(params) > 0:
+            for param in params:
+                parsedType = cls.parse(param)
                 parameters.append(parsedType)
-            if delim != '>' : 
-                raise ValueError('Type parsing error: close parameters list in a typename "%s" [%s]' % (strType, currPointer))
 
-            if cls.containers_single_param.has_key(name):
-                #debug('!!!!', parameters[0])
+            if cls.containers_single_param.has_key(name) \
+                    and len(parameters)==1 and isinstance(parameters[0], UMLType):
                 uml_type = parameters[0]
                 uml_type.add_qualifier(cls.containers_single_param[name])
-            elif cls.containers_double_param.has_key(name):
+            elif cls.containers_double_param.has_key(name) \
+                    and len(parameters)==1 and isinstance(parameters[2], UMLType):
                 uml_type = parameters[1]
                 uml_type.add_qualifier(cls.containers_double_param[name], key = parameters[0])
             elif cls.specifier_types.has_key(name):
@@ -166,8 +234,6 @@ class CppTypeParser(object):
             else:
                 uml_type = UMLType(name, scope=scope, properties=properties, parameters = parameters)
         else:
-            # if not cls.primitive_types.has_key('Int32'):
-            #     raise ValueError(strType)
             uml_type = UMLType(cls.primitive_types.get(name, name), scope=scope, properties=properties)
 
         m = cls.reFindRefPtr.search(strType[currPointer:])
@@ -184,14 +250,7 @@ class CppTypeParser(object):
             currPointer += len(m.group(0))
             del m
 
-        m = cls.reFindDelimiter.search(strType[currPointer:])
-        if m is not None:
-            delim = m.group(1)
-            currPointer += len(m.group(0))
-            del m
-
-        #debug(ptr, name, scope, delim, properties)
-        return uml_type, currPointer, delim
+        return uml_type, currPointer
 
 ######################################################################
 
@@ -206,7 +265,6 @@ class CppTextParser(object):
         'public'        : '+',
         }
 
-
     @classmethod
     def parse(cls, filename, uml_pool = None, include_paths= []):
         if uml_pool is None: uml_pool = UMLPool()
@@ -215,7 +273,8 @@ class CppTextParser(object):
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
 
-        uml_source = cls.create_source_artifact(uml_pool, cppHeader.headerFileName, local = True)
+        uml_source = cls.create_source_artifact(uml_pool, filename# cppHeader.headerFileName
+                                                , local = True)
         uml_pool.deployment.sources.add(uml_source, forced = True)
         sourceId = uml_source.id
         
