@@ -16,11 +16,18 @@ http://www.uml-diagrams.org/class-reference.html
 http://support.objecteering.com/objecteering6.1/help/us/cxx_developer/tour/code_model_equivalence.htm
 ######################################################################
 """
+from __future__ import print_function
+def warning(*objs):
+    import sys
+    print("WARNING: ", *objs, file=sys.stderr)
+def error(*objs):
+    import sys
+    print("ERROR: ", *objs, file=sys.stderr)
+
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
-
 from nxUML.core import UMLPool
-from nxUML.core import UMLQualifier, UMLType
+from nxUML.core import UMLQualifier, UMLType, UMLScope
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
@@ -90,17 +97,18 @@ class CppTypeParser(object):
     reString    = r'\"([^"]|\\")*\"'
     reScope     = r"({reId}(<.*>)?::)*".format(reId=reId)
     reDelimiter = r"<|>|,"
-    reRefPtr    = r"(const)?\s*(\*|&)"
+    reRefPtr    = r"(\*(\s*const)?|&)"
 
     # Compiled regexps in use
-    reFindId    = re.compile(r"^\s*({reId})\s*".format(reId=reId))
+    reFindId                  = re.compile(r"^\s*({reId})\s*".format(reId=reId))
     reFindNamespaceSeparator  = re.compile(r"^\s*::\s*")
-    reFindConstSuffix   = re.compile(r"^\s*(const)?\s*".\
-                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
-    reFindRefPtr        = re.compile(r"^\s*{reRefPtr}\s*".\
-                                         format(reScope=reScope, reId=reId, reRefPtr=reRefPtr))
-    reFindSpecifier     = re.compile(r"^\s*({reSpecifier})\s+".\
-                                         format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    reFindSuffixSpecifier     = re.compile(r"^\s*(const)\s*".\
+                                               format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    reFindPrefixSpecifier     = re.compile(r"^\s*({reSpecifier})\s+".\
+                                               format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    reFindRefPtr              = re.compile(r"^\s*{reRefPtr}\s*".\
+                                               format(reScope=reScope, reId=reId, reRefPtr=reRefPtr))
+    reCheckEmpty              = re.compile(r"^\s*$")
 
     # Deprivated regexps
     reFindPrimitive     = re.compile(r"^\s*({reScope})({reId})\s*".\
@@ -134,7 +142,7 @@ class CppTypeParser(object):
     @classmethod
     def parse(cls, strType):
         parsedType, ptr = cls.parse_from_pointer(str(strType), 0)
-        if len(strType) > ptr: 
+        if not cls.reCheckEmpty.match(strType[ptr:]) : 
             raise ValueError('Type parsing error: End of type "%s" is expected at [%s]' % (strType, ptr))
         #debug('"%s"' %delim)
         return parsedType
@@ -184,7 +192,7 @@ class CppTypeParser(object):
 
 
         while True:
-            m = cls.reFindSpecifier.search(strType[currPointer:])
+            m = cls.reFindPrefixSpecifier.search(strType[currPointer:])
             if m is None: break
             else: 
                 prop = cls.cpp_specifiers[m.group(1)]
@@ -192,7 +200,7 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
         del m
 
-        scope = ''
+        scope = UMLScope()
         while True:
             m = cls.reFindId.search(strType[currPointer:])
             if m is not None:
@@ -213,7 +221,7 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
                 del m
                 # @TODO here one may add some code for propper namespaces treatment
-                scope += name + '.'
+                scope.append(name)
 
         if params is not None and len(params) > 0:
             for param in params:
@@ -236,19 +244,23 @@ class CppTypeParser(object):
         else:
             uml_type = UMLType(cls.primitive_types.get(name, name), scope=scope, properties=properties)
 
-        m = cls.reFindRefPtr.search(strType[currPointer:])
-        if m is not None:
-            ptr_modif, ptr_type = m.group(1), m.group(2)
-            currPointer += len(m.group(0))
-            del m
-
-            if   ptr_type == '&': uml_type.reference    = True
-            elif ptr_type == '*': uml_type.pointer      = True
-
-        m = cls.reFindConstSuffix.search(strType[currPointer:])
+        m = cls.reFindSuffixSpecifier.search(strType[currPointer:])
         if m is not None:
             currPointer += len(m.group(0))
+            uml_type.add_property(cls.cpp_specifiers[m.group(1)])
             del m
+
+        uml_type.pointer = 0
+        while True:
+            m = cls.reFindRefPtr.search(strType[currPointer:])
+            if m is not None:
+                ptr_type, ptr_modif = m.group(1)[0], m.group(2)
+                currPointer += len(m.group(0))
+                del m
+
+                if   ptr_type == '&': uml_type.reference    = True
+                elif ptr_type == '*': uml_type.pointer += 1
+            else: break
 
         return uml_type, currPointer
 
@@ -257,6 +269,7 @@ class CppTypeParser(object):
 class CppTextParser(object):
     TypeParser = CppTypeParser
 
+
     header_ext = ('.hpp', '.hxx', '.h', '.h++')
 
     visibility_types = {
@@ -264,6 +277,10 @@ class CppTextParser(object):
         'protected'     : '#', 
         'public'        : '+',
         }
+
+    reGetAllCStyleComments = re.compile("/\*.*?\*/",re.DOTALL)
+    reGetCppStyleComments  = re.compile("//.*?\n")
+    reTypedef = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
 
     @classmethod
     def parse(cls, filename, uml_pool = None, include_paths= []):
@@ -335,7 +352,11 @@ class CppTextParser(object):
         # Work around class attributes
         for visibility in cls.visibility_types.keys():
             for attrib in data['properties'][visibility]:
-                cls.handle_attribute(uml_class, visibility = visibility, **attrib)
+                # Hack for incorrent processing of  usings and friends in CppHeaderParser:
+                #   CppHeaderParser recognizes usings and friend types inside classes as attributes.
+                #   Thus we simply ignore attributes which types contain keywords using or friend
+                if attrib['type'].find('using ') != 0 and attrib['type'].find('friend ') != 0: 
+                    cls.handle_attribute(uml_class, visibility = visibility, **attrib)
 
         # Work around class methods
         for visibility in cls.visibility_types.keys():
@@ -349,29 +370,33 @@ class CppTextParser(object):
             uml_source.classes.append(uml_class.id)
         else: uml_source.classes = [uml_class.id]
 
-
         # Work around class typedefs 
         # @TODO improve performance 
         # Reason: so far the code below is just a dirty hack 
         #         covering lack of typedef parsing in CppHeaderParser
-        reTypedef = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
-
         filename = uml_pool.deployment.sources.abspath(data['location'])
         with open (filename, "r") as myfile:
-            strFile = myfile.read().replace('\n', ' ')
+            # Remove C++ and C style comments and convert file in a 1 string
+            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", myfile.read())).replace('\n', ' ')
+            
             for visibility in cls.visibility_types.keys():
                 for typedef in data['typedefs'][visibility]:
                     # fix for "dirty" typedef name representation in CppHeaderParser 
                     # if type-name follows closing template parameters without spacing
                     if typedef[0] == '>': typedef = typedef[1:] 
 
-                    m = re.search(reTypedef.format(typedef), strFile)
-                    if m is not None:
-                        cls.handle_typedef(uml_pool, uml_class, name = typedef, 
-                                           type = m.group(2),
-                                           visibility = visibility,)
-                    else: 
-                        raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
+                    # Filter out typedefs for function pointers
+                    # @TODO implement proper work arount typedefs for pointers 
+                    if cls.TypeParser.reFindId.search(typedef) is not None:
+                        m = re.search(cls.reTypedef.format(typedef), strFile)
+                        if m is not None:
+                            cls.handle_typedef(uml_pool, uml_class, name = typedef, 
+                                               type = m.group(2),
+                                               visibility = visibility,)
+                        else: 
+                            raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
+                    else:
+                        warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
             del strFile
 
 

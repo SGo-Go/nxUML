@@ -29,7 +29,7 @@ class UMLBrownieInterface(UMLInterface):
     @classmethod
     def make_id(self, name, scope, stereotype):
         return "[{0}]{1}".format(stereotype[0], 
-                                name if scope is None else scope + '.' + name)
+                                 '.' + name if scope is None else scope + '.' + name)
 
     @property
     def id(self):
@@ -188,9 +188,13 @@ class BrownieTextParser(CppTextParser):
                 if len(uml_type.parameters) > 1:
                     data = uml_type.parameters[1].id
                 else: data = None
-                provider = uml_type.parameters[0].scope
-                if '.' in provider:
-                    provider = provider.split('.')[-1]
+                # @TODO Dirty hack for classes without scopes (crytical for concrete Brownie calls) 
+                try:
+                    provider = uml_type.parameters[0].scope[-1]
+
+                except IndexError: provider = None
+
+                #print provider
                 cls.handle_brownie_usage(uml_pool, uml_holder, 
                                          name = uml_type.parameters[0].name, 
                                          provider = provider, 

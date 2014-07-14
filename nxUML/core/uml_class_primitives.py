@@ -32,6 +32,15 @@ class UMLQualifier:
             format(bind="<<%s>>" % ",".join(self.bind),
                    key="%s"%",".join(map(lambda x: 'id:' + (x if type(x) is str else x.name), self.key)))
 
+class UMLScope(list):
+    # def __getitem__(self, key):
+    #     try:
+    #         return super(UMLScope, self).__getitem__(key-1)
+    #     except IndexError: return None
+
+    def __repr__(self):
+        return '.'.join(self)
+
 class UMLType(object):
     def __init__(self, name, 
                  scope = None, 
@@ -41,7 +50,7 @@ class UMLType(object):
                  #qualifier  = None,
                  multiplicity = 1,):
         self.name = name
-        if scope is not None and scope !="":
+        if scope is not None and len(scope) !=0:
             self._scope = scope
         if multiplicity is not None and multiplicity != 1:
             # if len(multiplicity) == 2:
@@ -127,14 +136,14 @@ class UMLType(object):
     @property
     def full_name(self):
         if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return self._scope + "." + self.name
+            return str(self._scope) + "." + self.name
         else: return self.name
 
     @property
     def scope(self):
         if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return self._scope #+ "."
-        else: return ''
+            return self._scope
+        else: return UMLScope()
 
     @property
     def multiplicity(self):
