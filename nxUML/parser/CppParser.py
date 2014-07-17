@@ -23,6 +23,9 @@ def warning(*objs):
 def error(*objs):
     import sys
     print("ERROR: ", *objs, file=sys.stderr)
+def debug(*args):
+    import sys
+    print("DBG: ", *args, file=sys.stderr)
 
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
@@ -31,12 +34,10 @@ from nxUML.core import UMLQualifier, UMLType, UMLScope
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
-from nxUML.core import UMLSourceFile
+from nxUML.core import UMLSourceFile,UMLSourceReference
 
 import re, os, math
 
-def debug(*args):
-    print(args)
 
 class CppTypeParser(object):
     primitive_types = {
@@ -100,7 +101,7 @@ class CppTypeParser(object):
     reRefPtr    = r"(\*(\s*const)?|&)"
 
     # Compiled regexps in use
-    reFindId                  = re.compile(r"^\s*({reId})\s*".format(reId=reId))
+    reFindId                  = re.compile(r"^\s*(template\s+)?({reId})\s*".format(reId=reId))
     reFindNamespaceSeparator  = re.compile(r"^\s*::\s*")
     reFindSuffixSpecifier     = re.compile(r"^\s*(const)\s*".\
                                                format(reSpecifier=r"|".join(cpp_specifiers.keys())))
@@ -118,9 +119,9 @@ class CppTypeParser(object):
     reFindValue         = re.compile(r"^\s*({reNumeric}|{reString})\s*".\
                                          format(reNumeric = reNumeric, reString = reString))
 
-    @classmethod
-    def cname2umlId(cls, name):
-        return name.replace('::', '.')
+    # @classmethod
+    # def cname2umlId(cls, name):
+    #     return name.replace('::', '.')
 
     @classmethod
     def eval(cls, expr):
@@ -144,7 +145,6 @@ class CppTypeParser(object):
         parsedType, ptr = cls.parse_from_pointer(str(strType), 0)
         if not cls.reCheckEmpty.match(strType[ptr:]) : 
             raise ValueError('Type parsing error: End of type "%s" is expected at [%s]' % (strType, ptr))
-        #debug('"%s"' %delim)
         return parsedType
 
     @classmethod
@@ -153,8 +153,8 @@ class CppTypeParser(object):
         #         It requires somewhat more sophisticated algorithm for <> parens analysis
         #         Similarly, if there are escape '\"' in string litrals, it might cause parsing problems
         # @TODO add safe recognition of  << and >> operators and strings literals
-        params = []
         if len(strType) > ptr + 1 and strType[ptr] == '<':
+            params = []
             unclosed_parens = []
             ptrCurr = ptr+1
             treat_string_literal = False
@@ -205,7 +205,11 @@ class CppTypeParser(object):
             m = cls.reFindId.search(strType[currPointer:])
             if m is not None:
                 currPointer += len(m.group(0))
-                name = m.group(1)
+
+                if m.group(1) is not None: keywordTemplate = True
+                else: keywordTemplate = False
+
+                name = m.group(2)
                 del m
             else:
                 raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
@@ -214,6 +218,9 @@ class CppTypeParser(object):
                 raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename "%s" [%s]' % (name, strType, currPointer))
 
             currPointer, params = cls.get_template_parameters(strType, currPointer)
+            if keywordTemplate and params is None:
+                raise ValueError('Type parsing error: Templated scope has no parameters in a typename "%s" [%s]' % (name, strType, currPointer))
+                
 
             m = cls.reFindNamespaceSeparator.search(strType[currPointer:])
             if m is None: break # part of name, not scope
@@ -269,7 +276,6 @@ class CppTypeParser(object):
 class CppTextParser(object):
     TypeParser = CppTypeParser
 
-
     header_ext = ('.hpp', '.hxx', '.h', '.h++')
 
     visibility_types = {
@@ -289,8 +295,14 @@ class CppTextParser(object):
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
+        
+        # debug(cppHeader.headerFileName)
+        # debug(cppHeader.__dict__['namespaces'])
+        # debug(cppHeader.__dict__['anon_union_counter'])
+        # debug(cppHeader.__dict__.keys())
 
         uml_source = cls.create_source_artifact(uml_pool, filename# cppHeader.headerFileName
+                                                , constructor = UMLSourceFile
                                                 , local = True)
         uml_pool.deployment.sources.add(uml_source, forced = True)
         sourceId = uml_source.id
@@ -316,7 +328,7 @@ class CppTextParser(object):
                 del subclasses
 
         del cppHeader
-        return uml_pool
+        return uml_source
 
     @classmethod
     def create_class(cls, uml_pool, **data):
@@ -328,7 +340,6 @@ class CppTextParser(object):
                              attribs   = [],
                              modifiers = [],
                              parent    = data['parent'],)
-        #debug('!!!', uml_class.__dict__)
 
         # Work around inheritances of class
         # Caution: it includes hack for improper 
@@ -512,18 +523,18 @@ class CppTextParser(object):
             full_name = filename
             local = False
 
-        uml_source = cls.create_source_artifact(uml_pool, full_name, local = found)
+        uml_source = cls.create_source_artifact(uml_pool, full_name, constructor = UMLSourceReference, local = found)
         uml_pool.deployment.sources.add(uml_source, forced = False)
         uml_pool.deployment.sources.add_edge(sourceId, uml_source.id)
         #exit()
 
 
     @classmethod
-    def create_source_artifact(cls, uml_pool, filename, **data):
+    def create_source_artifact(cls, uml_pool, filename, constructor = UMLSourceFile, **data):
         folder = os.path.dirname(filename)
         name, ext = os.path.splitext(os.path.basename(filename))
-        uml_source = UMLSourceFile(name, ext=ext, folder=folder,
-                                   stereotype = 'source',
+        uml_source = constructor(name, ext=ext, folder=folder,
+                                   # stereotype = 'C++ header',
                                    local = data['local'])
         uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
         return uml_source

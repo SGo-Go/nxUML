@@ -95,7 +95,7 @@ class UMLClassRelationsGraph(MultiDiGraph):
 
     def extract_generalizations(self, uml_pool, forced = True):
         for uml_relationship in uml_pool.generalizations_iter():
-            self.add_relationship(uml_relationship, forced_relationships)
+            self.add_relationship(uml_relationship, forced)
 
     def extract_associations(self, uml_pool, forced = True):
         pass

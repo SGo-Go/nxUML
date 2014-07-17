@@ -18,6 +18,7 @@ __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 from nxUML.core.uml_class_primitives    import UMLClass, UMLInterface, UMLType
 from nxUML.core.uml_class_relationships import *
 from nxUML.core.uml_artifacts           import *
+from nxUML.core.uml_class_diag          import UMLClassRelationsGraph
 
 class UMLDeploymentPool(object):
     def __init__(self, name='', 
@@ -109,3 +110,41 @@ class UMLPool(object):
         for relationship in self.relationships_iter():
             if isinstance(relationship, UMLGeneralization): 
                 yield (relationship)
+
+class UMLPoolDocumenter(object):
+    """Pool of classes with relationships between them
+    """
+    def __init__(self, uml_pool, **attr):
+        """Constructor 
+        """
+        self.pool = uml_pool
+        self.inheritances = UMLClassRelationsGraph(uml_pool = uml_pool, 
+                                                   with_generalizations = True,
+                                                   with_interfaces = False,
+                                                   auto_aggregation = False,
+                                                   forced_relationships = True
+                                                   )
+
+
+        self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
+                                                   with_generalizations = False,
+                                                   with_interfaces = False,
+                                                   auto_aggregation = True,
+                                                   forced_relationships = True
+                                                   )
+
+        self.ifaces = UMLClassRelationsGraph(uml_pool = uml_pool, 
+                                             with_generalizations = False,
+                                             with_interfaces = True,
+                                             auto_aggregation = False,
+                                             forced_relationships = True
+                                             ).reverse()
+
+    def class2XML(self, classId):
+        uml_class = self.pool.Class[classId]
+        xmlClass = uml_class.toXML(root = None)
+
+    def class2XML(self, classId):
+        uml_class = self.pool.Class[classId]
+        xmlClass = uml_class.toXML(root = None)
+
