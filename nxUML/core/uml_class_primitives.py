@@ -15,6 +15,7 @@ stored as networkx graph object.
 """
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
+######################################################################
 class UMLQualifier:
     def __init__(self, bind, key = 'int'):
         self.bind = [bind]
@@ -32,6 +33,7 @@ class UMLQualifier:
             format(bind="<<%s>>" % ",".join(self.bind),
                    key="%s"%",".join(map(lambda x: 'id:' + (x if type(x) is str else x.name), self.key)))
 
+######################################################################
 class UMLScope(list):
     # def __getitem__(self, key):
     #     try:
@@ -41,38 +43,103 @@ class UMLScope(list):
     def __repr__(self):
         return '.'.join(self)
 
-class UMLType(object):
+    @property
+    def id(self):
+        return '.'.join(self)
+
+######################################################################
+class UMLElement(object):
+    @property
+    def id(self):
+        raise NotImplementedError('Id must be implemented in shildren of UMLTypeBase')
+
+######################################################################
+class UMLNamedElement(UMLElement):
+    def __init__(self, name, **args):
+        self.name = name
+
+######################################################################
+class UMLBaseType(UMLNamedElement): pass
+
+######################################################################
+class UMLPrimitiveDataType(UMLBaseType):
+    @property
+    def id(self): return self.name
+
+######################################################################
+class UMLPackageableElement(UMLElement):
+    def __init__(self, scope, **args):
+        if scope is not None and len(scope) !=0:
+            self._scope = scope
+        super(UMLPackageableElement, self).__init__(**args)
+
+    @property
+    def scope(self):
+        if self.__dict__.has_key('_scope') and self._scope is not None: 
+            return self._scope
+        else: return UMLScope()
+
+######################################################################
+class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
+    def __init__(self, name, scope, **args):
+        super(UMLNamedPackageableElement, self).__init__(name=name, scope=scope, **args)
+
+    @property
+    def id(self):
+        return self.name #"{0}.{1}"format(self.scope.id, self.name)
+
+    @property
+    def full_name(self):
+        if self.__dict__.has_key('_scope') and self._scope is not None: 
+            return str(self._scope) + "." + self.name
+        else: return self.name
+
+######################################################################
+class UMLPackage(UMLNamedPackageableElement): pass
+
+######################################################################
+class UMLTemplateableElement(UMLNamedPackageableElement):
+    def __init__(self, name, scope, parameters, **args):
+        if len(parameters) > 0: self._parameters = parameters
+        super(UMLTemplateableElement, self).__init__(name = name, scope = scope)
+
+    @property
+    def parameters(self):
+        if self.__dict__.has_key('_parameters') and self._parameters is not None: 
+            return self._parameters
+        else: return []
+
+
+######################################################################
+class UMLPackage(UMLPackageableElement): pass
+
+######################################################################
+class UMLType(UMLTemplateableElement, UMLBaseType):
     def __init__(self, name, 
                  scope = None, 
                  properties = [],
                  parameters = [],
                  composite = True,
-                 #qualifier  = None,
+                 # qualifier  = None,
                  multiplicity = 1,):
-        self.name = name
-        if scope is not None and len(scope) !=0:
-            self._scope = scope
+
         if multiplicity is not None and multiplicity != 1:
             # if len(multiplicity) == 2:
             self._multiplicity = multiplicity
             # else:
             #     raise ValueError('Unexpected multiplicity type')
-        if len(properties) > 0:
-            self._properties = properties
-        if len(parameters) > 0:
-            self._parameters = parameters
+
         self.composite = composite
 
+        super(UMLType, self).__init__(name = name, 
+                                      scope = scope, 
+                                      parameters = parameters)
 
     def add_qualifier(self, bind, key = 'int'):
         if not  self.__dict__.has_key('_qualifier') or self._qualifier is None: 
             self._qualifier = UMLQualifier(bind, key)
         else:
             self._qualifier.extend(bind, key)
-
-    @property
-    def id(self):
-        return self.name
 
     @property
     def qualifier(self):
@@ -89,12 +156,6 @@ class UMLType(object):
     def properties(self):
         if self.__dict__.has_key('_properties') and self._properties is not None: 
             return self._properties
-        else: return []
-
-    @property
-    def parameters(self):
-        if self.__dict__.has_key('_parameters') and self._parameters is not None: 
-            return self._parameters
         else: return []
 
     @property
@@ -134,18 +195,6 @@ class UMLType(object):
                 self.composite     = False
 
     @property
-    def full_name(self):
-        if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return str(self._scope) + "." + self.name
-        else: return self.name
-
-    @property
-    def scope(self):
-        if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return self._scope
-        else: return UMLScope()
-
-    @property
     def multiplicity(self):
         if self.__dict__.has_key('_multiplicity') and self._multiplicity is not None: 
             if type(self._multiplicity) is int:
@@ -175,22 +224,19 @@ class UMLType(object):
         return xmlType
 
 ######################################################################
-
-class UMLClass(object):
+class UMLClass(UMLNamedPackageableElement):
     """
     Unified (language independent) representation of class
     """
     def __init__(self, name, 
                  location = None, 
-                 package  = None,
+                 scope  = None,
                  methods  = [],
                  attribs  = [],
                  modifiers  = [],
                  subclasses = [],
                  parent   = None,):
         # Fill data
-        self.name       = str(name)
-        self.package    = package
         self.location   = location
 
         self._modifiers = modifiers
@@ -203,6 +249,8 @@ class UMLClass(object):
 
         self.realizations = []
         self.usages       = []
+
+        super(UMLClass, self).__init__(name = str(name), scope = scope)
 
     def add_subclass(self, name):
         self.subclasses.append(name)
@@ -233,12 +281,6 @@ class UMLClass(object):
     @property
     def id(self):
         return self.name
-
-    @property
-    def full_name(self):
-        if self.__dict__.has_key('package') and self.package is not None: 
-            return self.package + "." + self.name
-        else: return self.name
 
     @property
     def modifiers(self):
@@ -277,7 +319,7 @@ class UMLClass(object):
 
     def __str__(self):
         modifiers  = self.modifiers
-        return "{line}\n{modifiers:^40}\n[{self.package}]{self.name}\n{line}\n{attributes}\n{line}\n{methods}\n{line}".\
+        return "{line}\n{modifiers:^40}\n[{self.scope}]{self.name}\n{line}\n{attributes}\n{line}\n{methods}\n{line}".\
             format(self=self, line= chr(196)*40, #unicode('\x80abc', errors='replace')*
                    attributes = "\n".join(map(str,self.attributes)),
                    methods    = "\n".join(map(str,self.methods)),
@@ -305,8 +347,8 @@ class UMLClass(object):
         xmlModifs       = etree.SubElement(xmlClass, "modifiers")
         xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
 
-        if len(self.package)>0:
-            xmlClass.set("package", self.package)
+        if len(self.scope)>0:
+            xmlClass.set("scope", self.scope)
 
         if len(self.location)>0:
             xmlClass.set("location", self.location)
@@ -321,6 +363,7 @@ class UMLClass(object):
 
         return xmlClass
 
+######################################################################
 class UMLClassAttribute:
     def __init__(self, name, type, 
                  visibility, 
@@ -362,6 +405,7 @@ class UMLClassAttribute:
         xmlType         = self.type.toXML(xmlAttrib)
         return xmlAttrib
 
+######################################################################
 class UMLClassMethod:
     def __init__(self, name, 
                  rtnType, parameters,
@@ -429,6 +473,7 @@ class UMLClassMethod:
         #     xmlRetType      = rtnType.toXML(xmlMethod)
         return xmlMethod
 
+######################################################################
 class UMLInterface(object):
     def __init__(self, name, 
                  scope    = None,
@@ -446,16 +491,3 @@ class UMLInterface(object):
         return r'{stereotypes}{self.scope}.{self.name}'.\
             format(self=self,
                    stereotypes = "<<%s>>"%",".join(self.stereotypes),)
-
-# class UMLRealizationPort:
-#     def __init__(self, interface):
-#         self.name       = str(name)
-#         self.stereotypes= stereotypes
-
-# class UMLUsagePort:
-#     def __init__(self, name, 
-#                  stereotypes = [],
-#                  provider = None):
-#         self.name       = str(name)
-#         self.stereotypes= stereotypes
-#         self.provider   = None

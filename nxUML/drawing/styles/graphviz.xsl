@@ -24,13 +24,13 @@
 	</xsl:attribute>
       </xsl:if>
       <xsl:attribute name="tooltip">
-	<xsl:value-of select="@package"/>.<xsl:value-of select="text()" />
+	<xsl:value-of select="@scope"/>.<xsl:value-of select="text()" />
       </xsl:attribute>TOOLTIP
       <tr><td><xsl:if test="./modifiers != ''">
 	<font face="Arial" point-size = "12">&#x00AB;<xsl:value-of select="modifiers"/>&#x00BB;</font><br/>
       </xsl:if>
       <xsl:if test="./@detalization-level > 3">
-      [<xsl:value-of select="@package"/>]</xsl:if>
+      [<xsl:value-of select="@scope"/>]</xsl:if>
       <xsl:choose>
 	<xsl:when test="@interface = 'yes' ">
 	  <i><b><xsl:value-of select="text()"/></b></i>

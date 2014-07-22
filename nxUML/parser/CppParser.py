@@ -334,7 +334,7 @@ class CppTextParser(object):
     def create_class(cls, uml_pool, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
-                             package   = str(data['namespace']).replace('::', '.'),
+                             scope   = str(data['namespace']).replace('::', '.'),
                              location  = data['location'], #cls.location2url(data['location']), @TODO url 
                              methods   = [],
                              attribs   = [],

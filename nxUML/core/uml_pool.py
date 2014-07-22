@@ -94,13 +94,13 @@ class UMLPool(object):
         """
         return iter(self.Class)
 
-    def classes_iter(self, package = ''):
+    def classes_iter(self, scope = ''):
         """Iterate over the classes from the given package.
         """
         for cls_name, uml_class in self.Classes.items():
-            if len(package) == 0:
+            if len(scope) == 0:
                 yield (uml_class)
-            elif uml_class.package == package:
+            elif uml_class.scope == scope:
                 yield (uml_class)
 
     def relationships_iter(self):
