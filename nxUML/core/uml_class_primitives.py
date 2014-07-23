@@ -16,25 +16,10 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 ######################################################################
-class UMLQualifier:
-    def __init__(self, bind, key = 'int'):
-        self.bind = [bind]
-        self.key  = [key]
-
-    def extend(self, bind, key =  'int'):
-        self.bind.append(bind)
-        self.bind.append(key)
-
-    def __str__(self):
-        # if len(self.key) == 1 and self.key[0] == 'int':
-        #     return '*'
-        # else:
-        return "bind={bind}, key={key}".\
-            format(bind="<<%s>>" % ",".join(self.bind),
-                   key="%s"%",".join(map(lambda x: 'id:' + (x if type(x) is str else x.name), self.key)))
-
-######################################################################
 class UMLScope(list):
+    """Relative scope. 
+    Used if the real scope is not known.
+    """
     # def __getitem__(self, key):
     #     try:
     #         return super(UMLScope, self).__getitem__(key-1)
@@ -48,26 +33,43 @@ class UMLScope(list):
         return '.'.join(self)
 
 ######################################################################
-class UMLElement(object):
+class IUMLElement(object):
     @property
     def id(self):
-        raise NotImplementedError('Id must be implemented in shildren of UMLTypeBase')
+        raise NotImplementedError('{0} elements are not identifiable'.format(type(self)))
 
 ######################################################################
-class UMLNamedElement(UMLElement):
+class UMLNamedElement(IUMLElement):
     def __init__(self, name, **args):
         self.name = name
 
 ######################################################################
-class UMLBaseType(UMLNamedElement): pass
+class IUMLDataType(UMLNamedElement): 
+    def toXML(self, root = None):
+        from lxml import etree
+
+        if root is None:
+            xmlType = etree.Element("datatype")
+        else: xmlType = etree.SubElement(root, "datatype")
+        xmlType.text = self.name
+        return xmlType
 
 ######################################################################
-class UMLPrimitiveDataType(UMLBaseType):
+class UMLPrimitiveDataType(IUMLDataType):
     @property
     def id(self): return self.name
 
+    def __repr__(self): return self.name
+
+UMLInt       = UMLPrimitiveDataType('int')
+UMLBoolean   = UMLPrimitiveDataType('boolean')
+UMLNone      = UMLPrimitiveDataType('')
+UMLChar      = UMLPrimitiveDataType('char')
+UMLUndefined = UMLPrimitiveDataType('undefined')
+UMLReal      = UMLPrimitiveDataType('real')
+
 ######################################################################
-class UMLPackageableElement(UMLElement):
+class UMLPackageableElement(IUMLElement):
     def __init__(self, scope, **args):
         if scope is not None and len(scope) !=0:
             self._scope = scope
@@ -86,7 +88,7 @@ class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
 
     @property
     def id(self):
-        return self.name #"{0}.{1}"format(self.scope.id, self.name)
+        return self.name #"{0}.{1}".format(self.scope.id, self.name)
 
     @property
     def full_name(self):
@@ -109,43 +111,138 @@ class UMLTemplateableElement(UMLNamedPackageableElement):
             return self._parameters
         else: return []
 
-
 ######################################################################
-class UMLPackage(UMLPackageableElement): pass
+class UMLMultiplicity(IUMLElement):
+    star = float('inf')
 
-######################################################################
-class UMLType(UMLTemplateableElement, UMLBaseType):
-    def __init__(self, name, 
-                 scope = None, 
-                 properties = [],
-                 parameters = [],
-                 composite = True,
-                 # qualifier  = None,
-                 multiplicity = 1,):
-
-        if multiplicity is not None and multiplicity != 1:
-            # if len(multiplicity) == 2:
-            self._multiplicity = multiplicity
-            # else:
-            #     raise ValueError('Unexpected multiplicity type')
-
-        self.composite = composite
-
-        super(UMLType, self).__init__(name = name, 
-                                      scope = scope, 
-                                      parameters = parameters)
-
-    def add_qualifier(self, bind, key = 'int'):
-        if not  self.__dict__.has_key('_qualifier') or self._qualifier is None: 
-            self._qualifier = UMLQualifier(bind, key)
-        else:
-            self._qualifier.extend(bind, key)
+    def __init__(self, multiplicity = None, 
+                 pointer = False, reference = False):
+        if   multiplicity is not None and multiplicity != 1:
+            self._range = multiplicity
+        elif pointer   : self.pointer   = True
+        elif reference : self.reference = True
+        super(UMLMultiplicity, self).__init__()
 
     @property
-    def qualifier(self):
-        if self.__dict__.has_key('_qualifier') and self._qualifier is not None: 
-            return str(self._qualifier)
-        else: return ''
+    def max(self):
+        if hasattr(self._range, '__iter__'):
+            return self._range[1]
+        else: return self._range
+
+    @property
+    def min(self):
+        if hasattr(self._range, '__iter__'):
+            return self._range[0]
+        else: return self._range
+
+    @property
+    def value(self):
+        return self.max
+
+    @property
+    def reference(self):
+        return self.value == 0
+
+    @property
+    def composite(self):
+        return self.min == 1 #and self.max == 1
+
+    @reference.setter
+    def reference(self, is_ref = True):
+        self._range = 0
+
+    @property
+    def pointer(self):
+        return self.min == 0 and self.max == 1
+
+    @pointer.setter
+    def pointer(self, is_ptr = True):
+        self._range = (0,1)
+
+    def __repr__(self):
+        m1 = self.min
+        m2 = self.max
+        if m2 == UMLMultiplicity.star: m2 = '*'
+        if m1 == 0: 
+            if   m2 ==  0 : return '&'
+            elif m2 == '*': return '*'
+        if m1 == m2: 
+            return '' if m1 == 1 else m1
+        else: return '{0}..{1}'.format(m1,m2)
+
+######################################################################
+class UMLQualifier(IUMLElement):
+    def __init__(self, bind, key = 'int'):
+        self.bind = bind
+        self.key  = key
+
+    def __repr__(self):
+        return "*(<<{self.bind}>>:{self.key})".format(self=self)
+        # return "bind=<<{self.bind}>>, key={:self.key}".format(self=self)
+        # return '*'
+
+######################################################################
+class UMLMultiplicityStack(list, IUMLElement):
+    reference = UMLMultiplicity(reference = True)
+    pointer   = UMLMultiplicity(pointer = True)
+
+    def __init__(self, uml_multy = []):
+        super(UMLMultiplicityStack,self).__init__(uml_multy)
+
+    # def extend(self, uml_multi):
+    #     self.append(uml_multi)
+
+    def add_reference(self):
+        self.append(UMLMultiplicityStack.reference)
+
+    def add_pointer(self):
+        self.append(UMLMultiplicityStack.pointer)
+
+    def add_qualifier(self, bind, key = 'int'):
+        self.append(UMLQualifier(bind, key))
+        
+    def __repr__(self):
+        return ' '.join(map(str,self))
+    # return "bind={bind}, key={key}".format(bind="<<%s>>" % ",".join(self.bind),
+    #        key="%s"%",".join(map(lambda x: 'id:' + (x if type(x) is str else x.name), self.key)))
+
+
+######################################################################
+class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
+    def __init__(self, name, 
+                 scope = None, 
+                 parameters = [],):
+        super(UMLSimpleDataType, self).__init__(name = name, 
+                                                scope = scope, 
+                                                parameters = parameters)
+
+    def __repr__(self):
+        parameters = ','.join(map(str,self.parameters))
+        return '{self.full_name}{parameters}'.\
+            format(self=self,
+                   parameters = '' if len(parameters) == 0 else '<%s>' % parameters)
+
+    def toXML(self, root = None):
+        from lxml import etree
+        xmlType = IUMLDataType.toXML(self, root)
+        return xmlType
+
+######################################################################
+class UMLDataTypeDecorator(IUMLElement):
+    def __init__(self, base, 
+                 properties = [],
+                 parameters = [],
+                 multiplicity = None):
+        self.base         = base
+        self.multiplicity = UMLMultiplicityStack() if multiplicity is None else multiplicity
+        self._properties  = properties
+        super(UMLDataTypeDecorator, self).__init__()
+
+    @property
+    def name(self): return self.base.name
+
+    @property
+    def scope(self): return self.base.scope
 
     def add_property(self, name):
         if not  self.__dict__.has_key('_properties') or self._properties is None: 
@@ -158,69 +255,23 @@ class UMLType(UMLTemplateableElement, UMLBaseType):
             return self._properties
         else: return []
 
-    @property
-    def reference(self):
-        if self.__dict__.has_key('_qualifier') and self._qualifier is not None: 
-            return False
-        else: 
-            if not self.composite and self.__dict__.has_key('_multiplicity') and self._multiplicity == 1:
-                return True
-            else: return False
-
-    @reference.setter
-    def reference(self, is_ref = True):
-        if is_ref:
-            if self.__dict__.has_key('_qualifier') and self._qualifier is not None: 
-                pass
-            else: 
-                self._multiplicity = 1
-                self.composite     = False
+    def __repr__(self):
+        strMulti = str(self.multiplicity)
+        return r'{self.base}{multi}{properties}'.\
+            format(self=self, multi = '[%s]' % strMulti if len(strMulti) > 0 else '',
+                   properties = "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),)
 
     @property
-    def pointer(self):
-        if self.__dict__.has_key('_qualifier') and self._qualifier is not None: 
-            return False
-        else: 
-            if not self.composite and self.__dict__.has_key('_multiplicity') and self._multiplicity == (0,1):
-                return True
-            else: return False
-
-    @pointer.setter
-    def pointer(self, is_ptr = True):
-        if is_ptr:
-            if self.__dict__.has_key('_qualifier') and self._qualifier is not None: 
-                pass
-            else:
-                self._multiplicity = (0,1)
-                self.composite     = False
-
-    @property
-    def multiplicity(self):
-        if self.__dict__.has_key('_multiplicity') and self._multiplicity is not None: 
-            if type(self._multiplicity) is int:
-                return str(self._multiplicity)
-            else: 
-                return '{mult[0]}..{mult[1]}'.format(mult=self._multiplicity)
-        else: return '1'
-
-    def __str__(self):
-        #return r'{self.scope}{self.name} {parameters} {properties} {self.multiplicity}'.
-        return r'{self.name}{parameters}{multiplicity} {properties} {self.qualifier}'.\
-            format(self=self,
-                   multiplicity = '' if self.composite else "[%s]" % self.multiplicity,
-                   parameters= "" if len(self.parameters) == 0 else map(str, self.parameters),
-                   properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),)
-
+    def composite(self):
+        return len(self.multiplicity) == 0 or self.multiplicity[0].composite
 
     def toXML(self, root = None):
         from lxml import etree
+        xmlType = self.base.toXML(root)
 
-        if root is None:
-            xmlType = etree.Element("type")
-        else: xmlType = etree.SubElement(root, "type")
         if not self.composite:
-            xmlType.set("multiplicity", "[%s]" % self.multiplicity)
-        xmlType.text = self.name
+            xmlType.set("multiplicity", str(self.multiplicity))
+
         return xmlType
 
 ######################################################################
@@ -257,7 +308,7 @@ class UMLClass(UMLNamedPackageableElement):
 
     def add_attribute(self, attrib):
         self.attributes.append(attrib)
-        #if attrib.is_utility: self._utility = False
+        # if attrib.is_utility: self._utility = False
 
     def add_attributes(self, attribs):
         if not self.__dict__.has_key("attributes") or self.attributes is None:
@@ -467,10 +518,10 @@ class UMLClassMethod:
             #print self.properties
             xmlMethod.set("properties", "{%s}"%",".join(self.properties))
 
-        xmlRetType      = etree.SubElement(xmlMethod, 'type')
+        xmlRetType      = etree.SubElement(xmlMethod, 'datatype')
         xmlRetType.text = self.rtnType
         # if self.rtnType is not None:
-        #     xmlRetType      = rtnType.toXML(xmlMethod)
+        #     xmlRetType      = self.rtnType.toXML(xmlMethod)
         return xmlMethod
 
 ######################################################################

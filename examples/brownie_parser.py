@@ -101,13 +101,13 @@ class UMLBrownieNotification(UMLBrownieInterface):
             format(self=self, 
                    stereotype = stereotype, name = name)
 
-class BrownieTypeParser(CppTypeParser):
-    specifier_types = {
-        # brownie::asynch::
-        'ServiceCallable'       : 'ServiceCallable',
-        'LocalCallable'         : 'LocalCallable',
-        'LocalCallback'         : 'LocalCallback',
-        }
+class BrownieTypeParser(CppTypeParser): pass
+#     specifier_types = {
+#         # brownie::asynch::
+#         'ServiceCallable'       : 'ServiceCallable',
+#         'LocalCallable'         : 'LocalCallable',
+#         'LocalCallback'         : 'LocalCallback',
+#         }
 
     # @classmethod
     # def parse_from_pointer(cls, strType, ptr):
@@ -173,30 +173,30 @@ class BrownieTextParser(CppTextParser):
 
     @classmethod
     def handle_generalization(cls, uml_pool, parent, child, **kwargs):
-        if parent.name == child.name:
-            for prop in ('ServiceCallable', 'LocalCallable', 'LocalCallback'):
-                if prop in parent.properties: 
-                    child.add_modifier(prop)
+        if parent.name in ('ServiceCallable', 'LocalCallable', 'LocalCallback') \
+                and len(parent.parameters) > 0 \
+                and parent.parameters[0].base.name == child.name:
+            child.add_modifier(parent.name)
         else:
             super(BrownieTextParser,cls).handle_generalization(uml_pool, parent, child,**kwargs)
 
     @classmethod
     def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
         if isinstance(uml_holder, UMLClass): #kwargs['visibility'] == 'public' and 
-            uml_type = cls.TypeParser.parse(kwargs['type'])
+            uml_type = cls.TypeParser.parse(kwargs['type']).base
             if uml_type.name in ('ConcreteNotification', 'ConcreteOperationCall'):
                 if len(uml_type.parameters) > 1:
-                    data = uml_type.parameters[1].id
+                    data = uml_type.parameters[1].base.id
                 else: data = None
                 # @TODO Dirty hack for classes without scopes (crytical for concrete Brownie calls) 
                 try:
-                    provider = uml_type.parameters[0].scope[-1]
+                    provider = uml_type.parameters[0].base.scope[-1]
 
                 except IndexError: provider = None
 
                 #print provider
                 cls.handle_brownie_usage(uml_pool, uml_holder, 
-                                         name = uml_type.parameters[0].name, 
+                                         name = uml_type.parameters[0].base.name, 
                                          provider = provider, 
                                          stereotype = cls.brownie_interface_stereotypes[uml_type.name],
                                          local_id = kwargs['name'], 
@@ -206,17 +206,17 @@ class BrownieTextParser(CppTextParser):
                     result_type  = None
                     error_type   = None
 
-                    value_type   = uml_type.parameters[0].id
+                    value_type   = uml_type.parameters[0].base.id
                     if len(uml_type.parameters) > 1:
-                        argument_type = uml_type.parameters[1].id
+                        argument_type = uml_type.parameters[1].base.id
                     else: argument_type = 'Void'
                 elif uml_type.name == 'FormalOperationCall':
                     value_type    = None
 
-                    argument_type = uml_type.parameters[0].id
-                    result_type = uml_type.parameters[1].id \
+                    argument_type = uml_type.parameters[0].base.id
+                    result_type = uml_type.parameters[1].base.id \
                         if len(uml_type.parameters) > 1 else None
-                    error_type = uml_type.parameters[2].id \
+                    error_type = uml_type.parameters[2].base.id \
                         if len(uml_type.parameters) > 2 else None
 
                 stereotype = cls.brownie_interface_stereotypes[uml_type.name]

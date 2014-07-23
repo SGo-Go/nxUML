@@ -30,29 +30,33 @@ def debug(*args):
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 from nxUML.core import UMLPool
-from nxUML.core import UMLQualifier, UMLType, UMLScope
+from nxUML.core import UMLQualifier, UMLMultiplicity
+from nxUML.core import UMLScope, UMLDataTypeDecorator
+from nxUML.core import UMLPrimitiveDataType, UMLSimpleDataType
 from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
 from nxUML.core import UMLSourceFile,UMLSourceReference
+from nxUML.core import UMLInt,UMLBoolean,UMLNone,UMLChar,UMLUndefined,UMLReal
+
 
 import re, os, math
 
 
 class CppTypeParser(object):
     primitive_types = {
-        'char'      : 'char',
-        'bool'      : 'boolean',
-        'short'     : 'int',
-        'signed'    : 'int',
-        'unsigned'  : 'int',
-        'unsigned short'    : 'int',
-        'unsigned char'     : 'int',
-        'char'      : 'int',
-        'float'     : 'real',
-        'double'    : 'real',
-        'void*'     : 'undefined',
-        'void'      : None,
+        'char'      : UMLChar,
+        'bool'      : UMLBoolean,
+        'short'     : UMLInt,
+        'signed'    : UMLInt,
+        'unsigned'  : UMLInt,
+        'unsigned short'    : UMLInt,
+        'unsigned char'     : UMLInt,
+        'char'      : UMLInt,
+        'float'     : UMLReal,
+        'double'    : UMLReal,
+        'void*'     : UMLUndefined,
+        'void'      : UMLNone,
         }
     containers_single_param = {
         'vector' : 'vector',
@@ -86,6 +90,10 @@ class CppTypeParser(object):
         'mutable' : 'mutable',
         'volatile': 'volatile',
         'typename': 'typename',
+
+        # Only functions 
+        # @TODO  fix this bug in CppParseHeader
+        'inline'  : 'inline',
         }
 
 
@@ -236,20 +244,25 @@ class CppTypeParser(object):
                 parameters.append(parsedType)
 
             if cls.containers_single_param.has_key(name) \
-                    and len(parameters)==1 and isinstance(parameters[0], UMLType):
+                    and len(parameters)==1 and isinstance(parameters[0], UMLDataTypeDecorator):
                 uml_type = parameters[0]
-                uml_type.add_qualifier(cls.containers_single_param[name])
+                uml_type.multiplicity.add_qualifier(cls.containers_single_param[name])
             elif cls.containers_double_param.has_key(name) \
-                    and len(parameters)==1 and isinstance(parameters[2], UMLType):
+                    and len(parameters)==1 and isinstance(parameters[2], UMLDataTypeDecorator):
                 uml_type = parameters[1]
-                uml_type.add_qualifier(cls.containers_double_param[name], key = parameters[0])
+                uml_type.multiplicity.add_qualifier(cls.containers_double_param[name], key = parameters[0])
             elif cls.specifier_types.has_key(name):
                 uml_type = parameters[0]
                 uml_type.add_property(cls.specifier_types[name])
             else:
-                uml_type = UMLType(name, scope=scope, properties=properties, parameters = parameters)
+                uml_base = UMLSimpleDataType(name, scope=scope, parameters = parameters)
+                uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
         else:
-            uml_type = UMLType(cls.primitive_types.get(name, name), scope=scope, properties=properties)
+            if name in cls.primitive_types.keys():
+                uml_base = cls.primitive_types[name]
+            else:
+                uml_base = UMLSimpleDataType(cls.primitive_types.get(name, name), scope=scope)
+            uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
 
         m = cls.reFindSuffixSpecifier.search(strType[currPointer:])
         if m is not None:
@@ -257,7 +270,6 @@ class CppTypeParser(object):
             uml_type.add_property(cls.cpp_specifiers[m.group(1)])
             del m
 
-        uml_type.pointer = 0
         while True:
             m = cls.reFindRefPtr.search(strType[currPointer:])
             if m is not None:
@@ -265,8 +277,8 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
                 del m
 
-                if   ptr_type == '&': uml_type.reference    = True
-                elif ptr_type == '*': uml_type.pointer += 1
+                if   ptr_type == '&': uml_type.multiplicity.add_reference()
+                elif ptr_type == '*': uml_type.multiplicity.add_pointer()
             else: break
 
         return uml_type, currPointer
@@ -274,6 +286,9 @@ class CppTypeParser(object):
 ######################################################################
 
 class CppTextParser(object):
+    PointerMultiplicity   = UMLMultiplicity(pointer = True)
+    ReferenceMultiplicity = UMLMultiplicity(reference = True)
+
     TypeParser = CppTypeParser
 
     header_ext = ('.hpp', '.hxx', '.h', '.h++')
@@ -356,7 +371,7 @@ class CppTextParser(object):
             if parent_name.count('<') == parent_name.count('>'):
                 new_generalization = True
                 cls.handle_generalization(uml_pool, 
-                                          parent = cls.TypeParser.parse(parent_name), 
+                                          parent = cls.TypeParser.parse(parent_name).base, 
                                           child  = uml_class,
                                           **gener_link_data)
 
@@ -440,7 +455,8 @@ class CppTextParser(object):
         visibility = cls.visibility_types.get(kwargs['visibility'], ' ')
         visibility+= {True:'/', False: ' '}[kwargs['virtual'] and not abstract]
 
-        rtnType    = cls.TypeParser.primitive_types.get(kwargs['rtnType'], kwargs['rtnType'])
+        rtnType    = kwargs['rtnType'] #cls.TypeParser.primitive_types.get(kwargs['rtnType'], kwargs['rtnType'])
+        # rtnType    = cls.TypeParser.parse(kwargs['rtnType'])
         parameters = [(param['name'], param['type']) for param in kwargs['parameters']]
 
         properties = []
@@ -534,7 +550,7 @@ class CppTextParser(object):
         folder = os.path.dirname(filename)
         name, ext = os.path.splitext(os.path.basename(filename))
         uml_source = constructor(name, ext=ext, folder=folder,
-                                   # stereotype = 'C++ header',
-                                   local = data['local'])
+                                 # stereotype = 'C++ header',
+                                 local = data['local'])
         uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
         return uml_source

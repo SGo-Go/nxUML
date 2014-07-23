@@ -105,9 +105,9 @@ class UMLClassRelationsGraph(MultiDiGraph):
         classes = sets.Set(self._classes.keys())
         for uml_class in self._classes.values():
             for attrib in uml_class.attributes:
-                if attrib.type.name in classes:
+                if attrib.type.base.id in classes:
                     aggr = UMLAggregation(uml_class, 
-                                          self._classes[attrib.type.name], attrib)
+                                          self._classes[attrib.type.base.id], attrib)
                     attrib.unfolding_level = 4
                     self.add_relationship(aggr)
 
@@ -327,9 +327,9 @@ class UMLClassDiagram(UMLClassRelationsGraph):
         classes = sets.Set(self._classes.keys())
         for uml_class in self._classes.values():
             for attrib in uml_class.attributes:
-                if attrib.type.name in classes:
+                if attrib.type.base.id in classes:
                     aggr = UMLAggregation(uml_class, 
-                                          self._classes[attrib.type.name], attrib)
+                                          self._classes[attrib.type.base.id], attrib)
                     attrib.unfolding_level = 4
                     self.add_relationship(aggr)
 

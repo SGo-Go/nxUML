@@ -90,26 +90,37 @@ class UMLAggregation(UMLBinaryRelationship):
         if attribute is not None:
             self.visibility = attribute.visibility
             self.role = attribute.name
-            self.composite = attribute.type.composite
-            self.qualifier = attribute.type.qualifier
+
+            self.multiplicity = attribute.type.multiplicity
+            # self.composite = attribute.type.composite
+            # self.qualifier = attribute.type.qualifier
+
             properties   = attribute.type.properties
-            if len(self.qualifier) > 0:
-                multiplicity =  '*'
-                if attribute.type.reference:
-                    properties = ['&'] + properties
-                elif attribute.type.pointer:
-                    properties = ['*'] + properties
-            else:
-                multiplicity = attribute.type.multiplicity
-            self.part_detalization = UMLDetalization(
-                multiplicity = multiplicity, 
-                #, qualifier = qualifier
-                properties = properties)
+            # if len(self.qualifier) > 0:
+            #     multiplicity =  '*'
+            #     if attribute.type.reference:
+            #         properties = ['&'] + properties
+            #     elif attribute.type.pointer:
+            #         properties = ['*'] + properties
+            # else:
+            #     multiplicity = attribute.type.multiplicity
+            # self.part_detalization = UMLDetalization(
+            #     multiplicity = multiplicity, 
+            #     #, qualifier = qualifier
+            #     properties = properties)
         super(UMLAggregation, self).__init__(whole, part)
 
     @property
     def full_role(self):
         return "{self.visibility}{self.role}\n{self.qualifier}".format(self=self)
+
+    @property
+    def full_role(self):
+        return "{self.visibility}{self.role}\n{self.qualifier}".format(self=self)
+
+    @property
+    def composite(self):
+        return self.multiplicity.composite #len(self.multiplicity) == 0 or not(self.multiplicity[0].reference or self.multiplicity[0].pointer)
 
     @property
     def shared(self):
