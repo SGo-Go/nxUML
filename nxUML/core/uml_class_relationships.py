@@ -38,6 +38,14 @@ class UMLBinaryRelationship(UMLRelationship):
     def __str__(self):
         return "{self.source.name}->{self.destination.name}".format(self=self)
 
+    def toXML(self, root = None):
+        xmlLink = super(UMLBinaryRelationship, self).toXML(root)
+
+        xmlSource = self.source.toXML(xmlLink, reference = True)
+        xmlDest   = self.destination.toXML(xmlLink, reference = True)
+
+        return xmlLink
+
 class UMLNaryRelationship(UMLRelationship):
     def __init__(self, *classifiers):
         self.classifiers = classifiers
@@ -74,6 +82,7 @@ class UMLBinaryAssociation(UMLBinaryRelationship):
             format(self=self, 
                    order_reading = '' if order_reading == '' else \
                        '|{0}>'.format(order_reading))
+
 
 class UMLNaryAssociation(UMLNaryRelationship):
     def __init__(self, classifiers, note = None):
@@ -122,10 +131,6 @@ class UMLAggregation(UMLBinaryRelationship):
         return "{self.visibility}{self.role}\n{self.qualifier}".format(self=self)
 
     @property
-    def full_role(self):
-        return "{self.visibility}{self.role}\n{self.qualifier}".format(self=self)
-
-    @property
     def composite(self):
         return self.multiplicity.composite #len(self.multiplicity) == 0 or not(self.multiplicity[0].reference or self.multiplicity[0].pointer)
 
@@ -151,6 +156,17 @@ class UMLAggregation(UMLBinaryRelationship):
 
     def __str__(self):
         return "{self.whole.name}<>-[{self.full_role}]-{self.destination.name}".format(self=self)
+
+    def toXML(self, root = None):
+        xmlLink = super(UMLAggregation, self).toXML(root)
+        xmlLink.set('type', 'aggregation')
+        xmlLink.set('visibility', self.visibility)
+        xmlLink.set('role', self.role)
+
+        for attrName, xmlType in zip(('whole', 'part'), xmlLink.findall('datatype')):
+            xmlType.set(attrName, 'yes')
+
+        return xmlLink
 
 ######################################################################
 
@@ -178,15 +194,12 @@ class UMLGeneralization(UMLBinaryRelationship):
     def __str__(self):
         return "{self.parent.name}<-[{self.visibility}]-{self.child.name}".format(self=self)
 
-
     def toXML(self, root = None):
-        from lxml import etree
-
         xmlLink = super(UMLGeneralization, self).toXML(root)
         xmlLink.set('type', 'generalization')
         xmlLink.set('visibility', self.visibility)
 
-        xmlSource = self.parent.toXML(xmlLink, reference = True)
-        xmlDest   = self.child.toXML (xmlLink, reference = True)
+        for attrName, xmlType in zip(('patent', 'child'), xmlLink.findall('datatype')):
+            xmlType.set(attrName, 'yes')
 
         return xmlLink

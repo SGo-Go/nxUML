@@ -332,6 +332,8 @@ class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
 
         from lxml import etree
         xmlType = IUMLDataType.toXML(self, root)
+        if self.scope:
+            xmlType.set("scope", self.scope.full_name)
         return xmlType
 
 ######################################################################
@@ -385,8 +387,7 @@ class UMLDataTypeDecorator(IUMLElement):
 
 ######################################################################
 class UMLClass(UMLNamedPackageableElement):
-    """
-    Unified (language independent) representation of class
+    """Unified (language independent) representation of class
     """
     def __init__(self, name, 
                  location = None, 
@@ -490,7 +491,7 @@ class UMLClass(UMLNamedPackageableElement):
 
     def toXML(self, root = None, reference = False):
         if reference:
-            xmlClass = UMLSimpleDataType(self.name, self.scope, parameters = self.parameters).toXML()
+            xmlClass = UMLSimpleDataType(self.name, self.scope).toXML(root)
             xmlClass.set("hrefId", self.id)
         else:
             from lxml import etree

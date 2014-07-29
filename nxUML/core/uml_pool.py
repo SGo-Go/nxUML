@@ -137,7 +137,6 @@ class UMLPoolDocumenter(object):
                                                    forced_relationships = True
                                                    )
 
-
         self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
                                                    with_generalizations = False,
                                                    with_interfaces = False,
