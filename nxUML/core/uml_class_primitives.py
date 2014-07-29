@@ -16,21 +16,74 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 ######################################################################
-class UMLScope(list):
+class UMLElementRelativeName(list):
     """Relative scope. 
     Used if the real scope is not known.
     """
+    def __init__(self, init_values = []):
+        if hasattr(init_values, '__iter__'):
+            super(UMLElementRelativeName, self).__init__(init_values)
+        else: super(UMLElementRelativeName, self).__init__((init_values,))
+
     # def __getitem__(self, key):
     #     try:
-    #         return super(UMLScope, self).__getitem__(key-1)
+    #         return super(UMLElementRelativeName, self).__getitem__(key-1)
     #     except IndexError: return None
 
+    @property
+    def full_name(self):
+        return '.'.join(self) if len(self) > 1 else self.name
+
+    @property
+    def name(self):
+        return self[-1] if len(self) > 0 else None
+
     def __repr__(self):
-        return '.'.join(self)
+        return str(self.full_name)
+
+    def __eq__(self, scope):
+        if self.name == '*': return True
+        # print('++', self, scope)
+        innerName = self.full_name
+        outerName = scope.full_name
+
+        if   innerName == outerName:
+            return True
+        elif len(innerName) < len(outerName):
+            return False
+        elif innerName == outerName[:-len(innerName)] and outerName[-len(innerName)-1] == '.':
+            return True
+        else: return False
+
+    def join(self, rel_path):
+        scope = rel_path
+        path_ending = []
+        while isinstance(scope, UMLNamedPackageableElement):
+            path_ending.append(scope.name)
+            scope = scope.scope
+        self.extend(scope)
+        while len(path_ending)>0:
+            self.append(path_ending.pop())
+        return self
+
+    def embed(self, rel_path):
+        if self.name == '*':
+            return self.scope.join(rel_path)
+        elif self.__eq__(rel_path):
+            return UMLElementRelativeName(self[:])
+        else: return None
+
+    @property
+    def scope(self):
+        return UMLElementRelativeName(self[:-1]) if len(self) > 1 else UMLElementRelativeName()
 
     @property
     def id(self):
-        return '.'.join(self)
+        return '.'.join(self) if len(self) > 1 else self.name
+
+    def rel_id(self, scope):
+        scope_id = scope.id
+        return '.'.join([scope_id, self.id]) if len(scope_id) > 0 else self.id
 
 ######################################################################
 class IUMLElement(object):
@@ -45,7 +98,7 @@ class UMLNamedElement(IUMLElement):
 
 ######################################################################
 class IUMLDataType(UMLNamedElement): 
-    def toXML(self, root = None):
+    def toXML(self, root = None, reference = False):
         from lxml import etree
 
         if root is None:
@@ -58,7 +111,6 @@ class IUMLDataType(UMLNamedElement):
 class UMLPrimitiveDataType(IUMLDataType):
     @property
     def id(self): return self.name
-
     def __repr__(self): return self.name
 
 UMLInt       = UMLPrimitiveDataType('int')
@@ -71,7 +123,9 @@ UMLReal      = UMLPrimitiveDataType('real')
 ######################################################################
 class UMLPackageableElement(IUMLElement):
     def __init__(self, scope, **args):
-        if scope is not None and len(scope) !=0:
+        if scope is not None \
+                or (isinstance(scope, UMLElementRelativeName) and len(scope) !=0) \
+                or isinstance(scope, UMLNamedElement):
             self._scope = scope
         super(UMLPackageableElement, self).__init__(**args)
 
@@ -79,25 +133,72 @@ class UMLPackageableElement(IUMLElement):
     def scope(self):
         if self.__dict__.has_key('_scope') and self._scope is not None: 
             return self._scope
-        else: return UMLScope()
+        else: return UMLElementRelativeName()
+
+    @scope.setter
+    def scope(self, new_scope):
+        self._scope = new_scope
 
 ######################################################################
 class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
-    def __init__(self, name, scope, **args):
+    def __init__(self, name, scope, subclasses = None, **args):
+        self.packages    = []
+        self.subclasses = [] if subclasses is None else subclasses
+        # self.subclass = []
         super(UMLNamedPackageableElement, self).__init__(name=name, scope=scope, **args)
+
+    def add_subclass(self, classId):
+        self.subclasses.append(classId)
+
+    def add_package(self, packageId):
+        self.packages.append(packageId)
 
     @property
     def id(self):
-        return self.name #"{0}.{1}".format(self.scope.id, self.name)
+        scopeId = self.scope.id
+        return ".".join((scopeId, self.name)) if scopeId and len(scopeId) > 0 else self.name
+        # return ".".join((self.scope.id, self.name)) 
+
+    def rel_id(self, scope):
+        scope_id = scope.id
+        return '.'.join([scope_id, self.id]) if len(scope_id) > 0 else self.id
 
     @property
     def full_name(self):
-        if self.__dict__.has_key('_scope') and self._scope is not None: 
-            return str(self._scope) + "." + self.name
+        if self.__dict__.has_key('_scope') and self._scope.id is not None: 
+            return self._scope.id + "." + self.name
         else: return self.name
 
+    # def get(self, uml_relname):
+    #     scope = max_scope
+    #     scope_id, relname_id = scope.id, uml_relname.id
+    #     item  = scope.get(uml_relname)
+    #     if item:    return item
+    #     else:       scope = scope.scope
+    #     return None
+
+
 ######################################################################
-class UMLPackage(UMLNamedPackageableElement): pass
+
+class UMLPackage(UMLNamedPackageableElement): 
+    def add_component(self, component):
+        pass
+
+    def __contains__(self, key):
+        return False # @TODO implement check
+
+    def __repr__(self):
+        return str(self.full_name)
+
+    def toXML(self, root = None, reference = False):
+        from lxml import etree
+
+        if root is None:
+            xmlPackage = etree.Element("package")
+        else: xmlPackage = etree.SubElement(root, "package")
+        xmlPackage.set('name', self.full_name)
+        xmlPackage.set('hrefId', self.id)
+        return xmlPackage
 
 ######################################################################
 class UMLTemplateableElement(UMLNamedPackageableElement):
@@ -171,13 +272,18 @@ class UMLMultiplicity(IUMLElement):
         else: return '{0}..{1}'.format(m1,m2)
 
 ######################################################################
+# @TODO Make transition UMLMultiplicity -> UMLQualifier
 class UMLQualifier(IUMLElement):
-    def __init__(self, bind, key = 'int'):
+    def __init__(self, bind, key = 'Id'):
         self.bind = bind
         self.key  = key
 
+    @property
+    def composite(self):
+        return True
+
     def __repr__(self):
-        return "*(<<{self.bind}>>:{self.key})".format(self=self)
+        return "*(<<bind>>{self.bind}<key={self.key}>)".format(self=self)
         # return "bind=<<{self.bind}>>, key={:self.key}".format(self=self)
         # return '*'
 
@@ -222,7 +328,8 @@ class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
             format(self=self,
                    parameters = '' if len(parameters) == 0 else '<%s>' % parameters)
 
-    def toXML(self, root = None):
+    def toXML(self, root = None, reference = False):
+
         from lxml import etree
         xmlType = IUMLDataType.toXML(self, root)
         return xmlType
@@ -231,7 +338,6 @@ class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
 class UMLDataTypeDecorator(IUMLElement):
     def __init__(self, base, 
                  properties = [],
-                 parameters = [],
                  multiplicity = None):
         self.base         = base
         self.multiplicity = UMLMultiplicityStack() if multiplicity is None else multiplicity
@@ -265,9 +371,12 @@ class UMLDataTypeDecorator(IUMLElement):
     def composite(self):
         return len(self.multiplicity) == 0 or self.multiplicity[0].composite
 
-    def toXML(self, root = None):
+    def toXML(self, root = None, reference = True):
         from lxml import etree
-        xmlType = self.base.toXML(root)
+        if isinstance(self.base, UMLClass):
+            xmlType = UMLSimpleDataType(self.base.name, self.base.scope).toXML(root)
+            xmlType.set("hrefId", self.base.id)
+        else: xmlType = self.base.toXML(root)
 
         if not self.composite:
             xmlType.set("multiplicity", str(self.multiplicity))
@@ -285,7 +394,7 @@ class UMLClass(UMLNamedPackageableElement):
                  methods  = [],
                  attribs  = [],
                  modifiers  = [],
-                 subclasses = [],
+                 subclasses = None,
                  parent   = None,):
         # Fill data
         self.location   = location
@@ -296,15 +405,11 @@ class UMLClass(UMLNamedPackageableElement):
 
         # Fill dependencies 
         self.parent       = parent
-        self.subclasses   = []
 
         self.realizations = []
         self.usages       = []
 
-        super(UMLClass, self).__init__(name = str(name), scope = scope)
-
-    def add_subclass(self, name):
-        self.subclasses.append(name)
+        super(UMLClass, self).__init__(name = str(name), scope = scope, subclasses = subclasses)
 
     def add_attribute(self, attrib):
         self.attributes.append(attrib)
@@ -329,9 +434,9 @@ class UMLClass(UMLNamedPackageableElement):
     def add_usage(self, iface_id):
         self.usages.append(iface_id)
 
-    @property
-    def id(self):
-        return self.name
+    # @property
+    # def id(self):
+    #     return self.name
 
     @property
     def modifiers(self):
@@ -383,34 +488,38 @@ class UMLClass(UMLNamedPackageableElement):
             if uml_method.visibility[0] == visibility:
                 yield (uml_method)
 
-    def toXML(self, root = None):
-        from lxml import etree
+    def toXML(self, root = None, reference = False):
+        if reference:
+            xmlClass = UMLSimpleDataType(self.name, self.scope, parameters = self.parameters).toXML()
+            xmlClass.set("hrefId", self.id)
+        else:
+            from lxml import etree
 
-        modifiers  = self.modifiers
+            modifiers  = self.modifiers
 
-        if root is None:
-            xmlClass = etree.Element("class")
-        else: xmlClass = etree.SubElement(root, "class")
-        xmlClass.text   = self.name
-        xmlClass.set("utility", "yes" if self.is_utility else "no")
-        if self.is_interface:
-            xmlClass.set("interface", "yes")
-        xmlModifs       = etree.SubElement(xmlClass, "modifiers")
-        xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
+            if root is None:
+                xmlClass = etree.Element("class")
+            else: xmlClass = etree.SubElement(root, "class")
+            xmlClass.text   = self.name
+            xmlClass.set("utility", "yes" if self.is_utility else "no")
+            if self.is_interface:
+                xmlClass.set("interface", "yes")
+            xmlModifs       = etree.SubElement(xmlClass, "modifiers")
+            xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
 
-        if len(self.scope)>0:
-            xmlClass.set("scope", self.scope)
+            if self.scope is not None:
+                xmlClass.set("scope", self.scope.full_name)
 
-        if len(self.location)>0:
-            xmlClass.set("location", self.location)
+            if len(self.location)>0:
+                xmlClass.set("location", self.location)
 
-        xmlAttribs      = etree.SubElement(xmlClass, "attributes")
-        for attrib in self.attributes:
-            xmlAttrib = attrib.toXML(xmlAttribs)
+            xmlAttribs      = etree.SubElement(xmlClass, "attributes")
+            for attrib in self.attributes:
+                xmlAttrib = attrib.toXML(xmlAttribs)
 
-        xmlMethods      = etree.SubElement(xmlClass, "methods")
-        for method in self.methods:
-            xmlMethod = method.toXML(xmlMethods)
+            xmlMethods      = etree.SubElement(xmlClass, "methods")
+            for method in self.methods:
+                xmlMethod = method.toXML(xmlMethods)
 
         return xmlClass
 

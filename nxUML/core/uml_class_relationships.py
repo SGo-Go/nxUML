@@ -20,8 +20,15 @@ __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 ######################################################################
 
 class UMLRelationship(object):
-    def __init__(self):
-        pass
+    def __init__(self): pass
+
+    def toXML(self, root = None):
+        from lxml import etree
+
+        if root is None:
+            xmlLink = etree.Element("relationship")
+        else: xmlLink = etree.SubElement(root, "relationship")
+        return xmlLink
 
 class UMLBinaryRelationship(UMLRelationship):
     def __init__(self, source, destination):
@@ -170,3 +177,16 @@ class UMLGeneralization(UMLBinaryRelationship):
 
     def __str__(self):
         return "{self.parent.name}<-[{self.visibility}]-{self.child.name}".format(self=self)
+
+
+    def toXML(self, root = None):
+        from lxml import etree
+
+        xmlLink = super(UMLGeneralization, self).toXML(root)
+        xmlLink.set('type', 'generalization')
+        xmlLink.set('visibility', self.visibility)
+
+        xmlSource = self.parent.toXML(xmlLink, reference = True)
+        xmlDest   = self.child.toXML (xmlLink, reference = True)
+
+        return xmlLink

@@ -42,6 +42,7 @@ class UMLPool(object):
         """Constructor 
         """
         self.Class           = {}
+        self.package         = {}
         self.Interface       = {}
         self._relationships  = []
 
@@ -51,6 +52,9 @@ class UMLPool(object):
 
     def add_class(self, uml_class):
         self.Class[uml_class.id] = uml_class
+
+    def add_package(self, uml_package):
+        self.package[uml_package.id] = uml_package
 
     def add_interface(self, uml_iface):
         self.Interface[uml_iface.id] = uml_iface
@@ -111,6 +115,14 @@ class UMLPool(object):
             if isinstance(relationship, UMLGeneralization): 
                 yield (relationship)
 
+    def get(self, uml_relname, max_scope):
+        scope = max_scope
+        while isinstance(scope, UMLPackage) or isinstance(scope, UMLClass):
+            item = scope.get(uml_relname)
+            if item:    return item
+            else:       scope = scope.scope
+        return None
+
 class UMLPoolDocumenter(object):
     """Pool of classes with relationships between them
     """
@@ -147,4 +159,3 @@ class UMLPoolDocumenter(object):
     def class2XML(self, classId):
         uml_class = self.pool.Class[classId]
         xmlClass = uml_class.toXML(root = None)
-

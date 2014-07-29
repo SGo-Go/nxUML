@@ -12,6 +12,7 @@ Project       nxUML
 Init-file for folder with core nxUML classes.
 ######################################################################
 """
+from nxUML.core.debug import debug,warning,error
 
 from nxUML.core.uml_class_primitives   import *
 from nxUML.core.uml_class_relationships import *

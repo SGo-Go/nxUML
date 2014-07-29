@@ -16,29 +16,21 @@ http://www.uml-diagrams.org/class-reference.html
 http://support.objecteering.com/objecteering6.1/help/us/cxx_developer/tour/code_model_equivalence.htm
 ######################################################################
 """
-from __future__ import print_function
-def warning(*objs):
-    import sys
-    print("WARNING: ", *objs, file=sys.stderr)
-def error(*objs):
-    import sys
-    print("ERROR: ", *objs, file=sys.stderr)
-def debug(*args):
-    import sys
-    print("DBG: ", *args, file=sys.stderr)
 
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
+from nxUML.core import debug,warning
+
 from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLMultiplicity
-from nxUML.core import UMLScope, UMLDataTypeDecorator
+from nxUML.core import UMLElementRelativeName, UMLDataTypeDecorator
+from nxUML.core import UMLPackage, UMLClass, UMLNamedPackageableElement
 from nxUML.core import UMLPrimitiveDataType, UMLSimpleDataType
-from nxUML.core import UMLClass, UMLClassMethod, UMLClassAttribute
+from nxUML.core import UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
 from nxUML.core import UMLSourceFile,UMLSourceReference
 from nxUML.core import UMLInt,UMLBoolean,UMLNone,UMLChar,UMLUndefined,UMLReal
-
 
 import re, os, math
 
@@ -146,7 +138,13 @@ class CppTypeParser(object):
             return True
         except SyntaxError: return False
         except: return False
-    
+
+    @classmethod
+    def parse_simple_scope(cls, strType):
+        # scope_pieces = strType.split('::')
+        # if len(scope_pieces) == 1:
+        uml_scope = UMLElementRelativeName(strType.split('::'))
+        return uml_scope
 
     @classmethod
     def parse(cls, strType):
@@ -208,7 +206,7 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
         del m
 
-        scope = UMLScope()
+        scope = UMLElementRelativeName()
         while True:
             m = cls.reFindId.search(strType[currPointer:])
             if m is not None:
@@ -248,7 +246,7 @@ class CppTypeParser(object):
                 uml_type = parameters[0]
                 uml_type.multiplicity.add_qualifier(cls.containers_single_param[name])
             elif cls.containers_double_param.has_key(name) \
-                    and len(parameters)==1 and isinstance(parameters[2], UMLDataTypeDecorator):
+                    and len(parameters)==2 and isinstance(parameters[1], UMLDataTypeDecorator):
                 uml_type = parameters[1]
                 uml_type.multiplicity.add_qualifier(cls.containers_double_param[name], key = parameters[0])
             elif cls.specifier_types.has_key(name):
@@ -301,20 +299,21 @@ class CppTextParser(object):
 
     reGetAllCStyleComments = re.compile("/\*.*?\*/",re.DOTALL)
     reGetCppStyleComments  = re.compile("//.*?\n")
-    reTypedef = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
+    reTypedef      = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
+    reGetAllUsings = re.compile(r"(\s|;|\}})using\s+(namespace)?\s+(({0}\s*::\s*)*{0})\s*;".format(TypeParser.reId), re.DOTALL)
 
     @classmethod
-    def parse(cls, filename, uml_pool = None, include_paths= []):
+    def parse(cls, filename, uml_pool = None, include_paths = []):
         if uml_pool is None: uml_pool = UMLPool()
 
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
-        
-        # debug(cppHeader.headerFileName)
-        # debug(cppHeader.__dict__['namespaces'])
-        # debug(cppHeader.__dict__['anon_union_counter'])
-        # debug(cppHeader.__dict__.keys())
+        # @TODO improve performance 
+        # Note: dirty hack
+        #     Use find_open_scopes to find all usings 
+        #     (usings are not supported by CppParseHeader)
+        usings = cls.find_open_scopes(filename)
 
         uml_source = cls.create_source_artifact(uml_pool, filename# cppHeader.headerFileName
                                                 , constructor = UMLSourceFile
@@ -324,6 +323,14 @@ class CppTextParser(object):
         
         source_folder = os.path.join(uml_pool.deployment.sources.source_prefix, 
                                      uml_source.folder)
+
+        for using in usings:
+            cls.handle_using(uml_pool, name = using, 
+                             location = sourceId)
+
+        for namespace in cppHeader.namespaces:
+            cls.handle_package(uml_pool, name = str(namespace), 
+                               location = sourceId)
 
         all_include_paths = [source_folder] + list(include_paths)
         for sourceFile in cppHeader.includes:
@@ -346,10 +353,23 @@ class CppTextParser(object):
         return uml_source
 
     @classmethod
+    def find_open_scopes(cls, filename, uml_pool = None, include_paths = []):
+        # filename = uml_pool.deployment.sources.abspath(data['location'])
+        with open(filename, "r") as fileToAnalyse:
+            # Remove C++ and C style comments and convert file in a 1 string
+            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", fileToAnalyse.read())).replace('\n', ' ')
+            usings = []
+            for m in cls.reGetAllUsings.finditer(strFile):
+                using = m.group(3)
+                if m.group(2) is not None: using += '::*'
+                usings.append(using)
+        return usings
+
+    @classmethod
     def create_class(cls, uml_pool, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
-                             scope   = str(data['namespace']).replace('::', '.'),
+                             scope     = cls.TypeParser.parse_simple_scope(data['namespace']), #str(data['namespace']).replace('::', '.'),
                              location  = data['location'], #cls.location2url(data['location']), @TODO url 
                              methods   = [],
                              attribs   = [],
@@ -401,9 +421,9 @@ class CppTextParser(object):
         # Reason: so far the code below is just a dirty hack 
         #         covering lack of typedef parsing in CppHeaderParser
         filename = uml_pool.deployment.sources.abspath(data['location'])
-        with open (filename, "r") as myfile:
+        with open (filename, "r") as fileToAnalyse:
             # Remove C++ and C style comments and convert file in a 1 string
-            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", myfile.read())).replace('\n', ' ')
+            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", fileToAnalyse.read())).replace('\n', ' ')
             
             for visibility in cls.visibility_types.keys():
                 for typedef in data['typedefs'][visibility]:
@@ -542,8 +562,6 @@ class CppTextParser(object):
         uml_source = cls.create_source_artifact(uml_pool, full_name, constructor = UMLSourceReference, local = found)
         uml_pool.deployment.sources.add(uml_source, forced = False)
         uml_pool.deployment.sources.add_edge(sourceId, uml_source.id)
-        #exit()
-
 
     @classmethod
     def create_source_artifact(cls, uml_pool, filename, constructor = UMLSourceFile, **data):
@@ -554,3 +572,107 @@ class CppTextParser(object):
                                  local = data['local'])
         uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
         return uml_source
+
+    @classmethod
+    def handle_package(cls, uml_pool, name = '', **data):
+        # pckgAsType = cls.TypeParser.parse(name).base
+        # uml_pckg   = UMLPackage(name = pckgAsType.name, scope = pckgAsType.scope)
+        pckgScope = cls.TypeParser.parse_simple_scope(name)
+        pckgName  = pckgScope.pop()
+        # pckgScopeId = pckgScope.id
+        # if uml_pool.package.has_key(pckgScopeId):
+        #     pckgScope = uml_pool.package[pckgScopeId]
+
+        uml_pckg  = UMLPackage(name = pckgName, scope = pckgScope)
+        if uml_pool.package.has_key(uml_pckg.id):
+            uml_pckg = uml_pool.package[uml_pckg.id]
+        else: uml_pool.add_package(uml_pckg)
+            
+    @classmethod
+    def handle_using(cls, uml_pool, name, location = None, **data):
+        if location is not None:
+            uml_relname = cls.TypeParser.parse_simple_scope(name)
+            uml_pool.deployment.source(location).open_names.append(uml_relname)
+
+    @classmethod
+    def resolve_names(cls, uml_pool):
+        idTypes = dict(map(lambda name: (name,'package'), uml_pool.package.keys()) +
+                       map(lambda name: (name,'Class'), uml_pool.Class.keys()))
+        getElementById = lambda uml_pool, idType: \
+            eval('uml_pool.{0}[idType]'.format(idTypes[idType]))
+        hasElementWithId = lambda idType: idTypes.has_key(idType)
+
+        # Loop over packages
+        for pckgId, pckgItem in uml_pool.package.items():
+            pckgScopeId = pckgItem.scope.id
+            if hasElementWithId(pckgScopeId) :
+                pckgItem.scope = getElementById(uml_pool, pckgScopeId)
+
+        # Loop over classes
+        for classId, classItem in uml_pool.Class.items():
+            classScopeId = classItem.scope.id
+            if isinstance(classItem.scope, UMLElementRelativeName) \
+                    and hasElementWithId(classScopeId) :
+                classItem.scope = getElementById(uml_pool, classScopeId)
+
+            
+            # Reviel relevant usings for name resolution 
+            name_openings = cls.get_name_openings(uml_pool, classItem.location)
+
+            # Resolve names for attributes taking into account usings
+            for attrib in classItem.attributes:
+                attrib.type.base = cls.resolve_simple_type(uml_pool, attrib.type.base, 
+                                                           classItem, name_openings)
+
+        # Loop over relationships
+        for uml_relationship in uml_pool.relationships_iter():
+            uml_parent = uml_relationship.parent
+            uml_child  = uml_relationship.child
+            if isinstance(uml_child, UMLClass):
+                uml_relationship.parent = cls.resolve_simple_type(uml_pool, uml_parent, 
+                                                                  uml_child.scope, name_openings)
+
+    @classmethod
+    def resolve_simple_type(cls, uml_pool, uml_type_base, 
+                            embracing_scope, name_openings):
+        """Resolve single name
+        """
+        if isinstance(uml_type_base, UMLSimpleDataType):
+            path_to_try = [uml_type_base]
+            for relpath in name_openings:
+                new_path = relpath.embed(uml_type_base)
+                if new_path:
+                    path_to_try.append(new_path)
+                    # if embracing_scope.name == 'CMapCommandBroker' and uml_type_base.name == 'IPersistenceService':
+                    #     debug(new_path) #relpath, uml_type_base, 
+
+            # @TODO Implement correct scope resolution order
+            for new_path in path_to_try:
+                attribClassId = new_path.id
+                if uml_pool.Class.has_key(attribClassId):
+                    return uml_pool.Class[attribClassId]
+                else:
+                    scope = embracing_scope
+                    while isinstance(scope, UMLNamedPackageableElement):
+                        attribClassId = new_path.rel_id(scope)
+                        if uml_pool.Class.has_key(attribClassId):
+                            return uml_pool.Class[attribClassId]
+                        else: scope = scope.scope
+        return uml_type_base
+
+    @classmethod
+    def get_name_openings(cls, uml_pool, sourceId,):
+        """Get usings from headers (upto 1 level of depth in hierarchy) 
+        for further name resolution 
+        """
+        name_openings = []
+        if sourceId:
+            uml_source = uml_pool.deployment.source(sourceId)
+            headers = [uml_source]
+            for sourceId in uml_pool.deployment.sources.succ[uml_source.id]:
+                headers.append(uml_pool.deployment.source(sourceId))
+
+            for uml_source in headers:
+                name_openings.extend(uml_source.open_names)
+            # debug(name_openings)
+        return name_openings
