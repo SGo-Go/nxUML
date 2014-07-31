@@ -228,7 +228,7 @@ class BrownieTextParser(CppTextParser):
                                                result_type   = result_type,
                                                error_type    = error_type,
                                                value_type    = value_type,
-                                             )
+                                               )
             else:
                 super(BrownieTextParser,cls).handle_typedef(uml_pool, uml_holder, **kwargs)
             del uml_type
@@ -259,4 +259,3 @@ class BrownieTextParser(CppTextParser):
     def handle_brownie_usage(cls, uml_pool, uml_class, **kwargs):
         uml_usage = UMLBrownieInterface.make_id(kwargs['name'], kwargs['provider'], kwargs['stereotype'])
         uml_class.add_usage(uml_usage)
-

@@ -43,7 +43,6 @@ class UMLElementRelativeName(list):
 
     def __eq__(self, scope):
         if self.name == '*': return True
-        # print('++', self, scope)
         innerName = self.full_name
         outerName = scope.full_name
 
@@ -84,6 +83,18 @@ class UMLElementRelativeName(list):
     def rel_id(self, scope):
         scope_id = scope.id
         return '.'.join([scope_id, self.id]) if len(scope_id) > 0 else self.id
+
+
+######################################################################
+class UMLElementRelativeName(list):
+    """Relative scope. 
+    Used if the real scope is not known.
+    """
+    def __init__(self, init_values = []):
+        if hasattr(init_values, '__iter__'):
+            super(UMLElementRelativeName, self).__init__(init_values)
+        else: super(UMLElementRelativeName, self).__init__((init_values,))
+
 
 ######################################################################
 class IUMLElement(object):
@@ -177,7 +188,6 @@ class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
     #     else:       scope = scope.scope
     #     return None
 
-
 ######################################################################
 
 class UMLPackage(UMLNamedPackageableElement): 
@@ -190,14 +200,19 @@ class UMLPackage(UMLNamedPackageableElement):
     def __repr__(self):
         return str(self.full_name)
 
-    def toXML(self, root = None, reference = False):
+    def toXML(self, root = None, reference = False, scope = False):
         from lxml import etree
-
-        if root is None:
-            xmlPackage = etree.Element("package")
-        else: xmlPackage = etree.SubElement(root, "package")
-        xmlPackage.set('name', self.full_name)
-        xmlPackage.set('hrefId', self.id)
+        if scope:
+            xmlPackage = etree.SubElement(root, "scope")
+            xmlPackage.set('name', self.name)
+            xmlPackage.set('hrefId', self.id)
+            xmlPackage.text = self.full_name
+        else:
+            if root is None:
+                xmlPackage = etree.Element("package")
+            else: xmlPackage = etree.SubElement(root, "package")
+            xmlPackage.set('name', self.full_name)
+            xmlPackage.set('hrefId', self.id)
         return xmlPackage
 
 ######################################################################
@@ -271,6 +286,17 @@ class UMLMultiplicity(IUMLElement):
             return '' if m1 == 1 else m1
         else: return '{0}..{1}'.format(m1,m2)
 
+    def toXML(self, root, reference = False):
+        from lxml import etree
+        xmlMulti = etree.SubElement(root, "multiplicity")
+
+        if self.reference: xmlMulti.set('type', 'reference')
+        elif self.pointer: xmlMulti.set('type',   'pointer')
+        else: xmlMulti.set('type',   'arbitrary')
+
+        xmlMulti.text = str(self)
+        return xmlMulti
+
 ######################################################################
 # @TODO Make transition UMLMultiplicity -> UMLQualifier
 class UMLQualifier(IUMLElement):
@@ -286,6 +312,17 @@ class UMLQualifier(IUMLElement):
         return "*(<<bind>>{self.bind}<key={self.key}>)".format(self=self)
         # return "bind=<<{self.bind}>>, key={:self.key}".format(self=self)
         # return '*'
+
+    def toXML(self, root, reference = False):
+        from lxml import etree
+
+        xmlMulti = etree.SubElement(root, "multiplicity")
+        xmlMulti.set('type', 'quantifier')
+        xmlMulti.set('bind', self.bind)
+        xmlMulti.set('key',  str(self.key))
+
+        xmlMulti.text = str(self)
+        return xmlMulti
 
 ######################################################################
 class UMLMultiplicityStack(list, IUMLElement):
@@ -312,6 +349,9 @@ class UMLMultiplicityStack(list, IUMLElement):
     # return "bind={bind}, key={key}".format(bind="<<%s>>" % ",".join(self.bind),
     #        key="%s"%",".join(map(lambda x: 'id:' + (x if type(x) is str else x.name), self.key)))
 
+    def toXML(self, root, reference = False):
+        for multi in self:
+            xmlMulti = multi.toXML(root)
 
 ######################################################################
 class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
@@ -381,7 +421,8 @@ class UMLDataTypeDecorator(IUMLElement):
         else: xmlType = self.base.toXML(root)
 
         if not self.composite:
-            xmlType.set("multiplicity", str(self.multiplicity))
+            xmlMulti = self.multiplicity.toXML(xmlType)
+            # xmlType.set("multiplicity", str(self.multiplicity))
 
         return xmlType
 
@@ -625,7 +666,6 @@ class UMLClassMethod:
         xmlMethod.text  = self.name
 
         if len(self.properties) > 0:
-            #print self.properties
             xmlMethod.set("properties", "{%s}"%",".join(self.properties))
 
         xmlRetType      = etree.SubElement(xmlMethod, 'datatype')
