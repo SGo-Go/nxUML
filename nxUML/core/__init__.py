@@ -16,6 +16,7 @@ from nxUML.core.debug import debug,warning,error
 
 from nxUML.core.uml_class_primitives    import *
 from nxUML.core.uml_multiplicity        import *
+from nxUML.core.uml_classifier          import *
 from nxUML.core.uml_datatype            import *
 from nxUML.core.uml_package             import *
 from nxUML.core.uml_class               import *

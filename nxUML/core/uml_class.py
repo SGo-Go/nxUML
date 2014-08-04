@@ -16,10 +16,10 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 
-from nxUML.core.uml_class_primitives    import UMLNamedPackageableElement
+from nxUML.core.uml_classifier import UMLClassifier
 
 ######################################################################
-class UMLClass(UMLNamedPackageableElement):
+class UMLClass(UMLClassifier):
     """Unified (language independent) representation of class
     """
     def __init__(self, name, 

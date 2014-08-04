@@ -57,7 +57,7 @@ class UMLElementRelativeName(list):
     def join(self, rel_path):
         scope = rel_path
         path_ending = []
-        while isinstance(scope, UMLNamedPackageableElement):
+        while isinstance(scope, UMLNamespace):
             path_ending.append(scope.name)
             scope = scope.scope
         self.extend(scope)
@@ -86,17 +86,36 @@ class UMLElementRelativeName(list):
 
 ######################################################################
 class IUMLElement(object):
+    """Abstract root UML metaclass
+    """
     @property
     def id(self):
         raise NotImplementedError('{0} elements are not identifiable'.format(type(self)))
 
 ######################################################################
 class UMLNamedElement(IUMLElement):
+    """An abstract UML element that may have a name. 
+    The name is used for identification of the named element 
+    within the namespaces in which it is defined or accessible. 
+    """
     def __init__(self, name, **args):
         self.name = name
 
 ######################################################################
+class UMLRedefinableElement(UMLNamedElement):
+    """An abstract named element that, 
+    when defined in the context of generalization of a classifier, 
+    can be redefined more specifically or differently 
+    in the context of another classifier that specializes the context classifier. 
+    """
+    @property
+    def isLeaf(self):
+        return True
+
+######################################################################
 class UMLPackageableElement(IUMLElement):
+    """Container for named elements.
+    """
     def __init__(self, scope, **args):
         if scope is not None \
                 or (isinstance(scope, UMLElementRelativeName) and len(scope) !=0) \
@@ -115,12 +134,14 @@ class UMLPackageableElement(IUMLElement):
         self._scope = new_scope
 
 ######################################################################
-class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
+class UMLNamespace(UMLPackageableElement, UMLNamedElement):
+    """
+    """
     def __init__(self, name, scope, subclasses = None, **args):
         self.packages    = []
         self.subclasses = [] if subclasses is None else subclasses
         # self.subclass = []
-        super(UMLNamedPackageableElement, self).__init__(name=name, scope=scope, **args)
+        super(UMLNamespace, self).__init__(name=name, scope=scope, **args)
 
     def add_subclass(self, classId):
         self.subclasses.append(classId)
@@ -145,7 +166,10 @@ class UMLNamedPackageableElement(UMLPackageableElement, UMLNamedElement):
         else: return self.name
 
 ######################################################################
-class UMLTemplateableElement(UMLNamedPackageableElement):
+class UMLTemplateableElement(UMLNamespace):
+    """An element that can optionally be defined 
+    as a template or bound to other templates.
+    """
     def __init__(self, name, scope, parameters, **args):
         if len(parameters) > 0: self._parameters = parameters
         super(UMLTemplateableElement, self).__init__(name = name, scope = scope)

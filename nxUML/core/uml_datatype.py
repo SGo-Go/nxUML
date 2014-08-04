@@ -16,7 +16,7 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 from nxUML.core.uml_class_primitives    import IUMLElement, \
-    UMLNamedElement, UMLNamedPackageableElement, UMLTemplateableElement
+    UMLNamedElement, UMLTemplateableElement #, UMLNamespace
 from nxUML.core.uml_multiplicity        import UMLMultiplicityStack
 
 ######################################################################

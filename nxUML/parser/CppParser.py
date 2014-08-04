@@ -24,7 +24,7 @@ from nxUML.core import debug,warning
 from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLMultiplicity
 from nxUML.core import UMLElementRelativeName, UMLDataTypeDecorator
-from nxUML.core import UMLPackage, UMLClass, UMLNamedPackageableElement
+from nxUML.core import UMLPackage, UMLClass, UMLNamespace
 from nxUML.core import UMLPrimitiveDataType, UMLDataTypeStub
 from nxUML.core import UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
@@ -675,7 +675,7 @@ class CppTextParser(object):
                     return uml_pool.Class[attribClassId]
                 else:
                     scope = embracing_scope
-                    while isinstance(scope, UMLNamedPackageableElement):
+                    while isinstance(scope, UMLNamespace):
                         attribClassId = new_path.rel_id(scope)
                         if uml_pool.Class.has_key(attribClassId):
                             return uml_pool.Class[attribClassId]
