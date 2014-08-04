@@ -315,11 +315,20 @@ class CppTextParser(object):
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
+
         # @TODO improve performance 
         # Note: dirty hack
-        #     Use find_open_scopes to find all usings 
-        #     (usings are not supported by CppParseHeader)
-        usings = cls.find_open_scopes(filename)
+        #    Brute search and analysis of elements whish are not pppparsed by CppHeaderParser
+        strCppCode = ""
+        with open(filename, "r") as fileToAnalyse:
+            # Remove C++ and C style comments and convert file in a 1 string
+            strCppCode = cls.reGetAllCStyleComments.sub \
+                ("", cls.reGetCppStyleComments.sub \
+                     ("", fileToAnalyse.read())).replace('\n', ' ')
+
+            #     Use find_open_scopes to find all usings 
+            #     (usings are not supported by CppParseHeader)
+            usings = cls.find_open_scopes(strCppCode)
 
         ########################################
         # Fill-up artifact for the header file 
@@ -330,6 +339,7 @@ class CppTextParser(object):
         uml_pool.deployment.sources.add(uml_source, forced = True)
         sourceId = uml_source.id
         
+        # Add hash to artifact if required
         if hash_type is not None:
             import hashlib
             uml_source.hash = (hash_type,
@@ -365,26 +375,25 @@ class CppTextParser(object):
                                        for name, data in cppHeader.classes.items() \
                                        if data['parent'] == className])
                 cls.handle_class(uml_pool, 
-                                 location = sourceId,
-                                 subclasses  = subclasses,
+                                 location       = sourceId,
+                                 subclasses     = subclasses,
+                                 cpp_code       = strCppCode,
                                  **cppHeader.classes[className])
                 del subclasses
 
         # Free memory and return reference on include artifact
         del cppHeader
+        del strCppCode
         return uml_source
 
     @classmethod
-    def find_open_scopes(cls, filename, uml_pool = None, include_paths = []):
+    def find_open_scopes(cls, strCppCode, uml_pool = None, include_paths = []):
         # filename = uml_pool.deployment.sources.abspath(data['location'])
-        with open(filename, "r") as fileToAnalyse:
-            # Remove C++ and C style comments and convert file in a 1 string
-            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", fileToAnalyse.read())).replace('\n', ' ')
-            usings = []
-            for m in cls.reGetAllUsings.finditer(strFile):
-                using = m.group(3)
-                if m.group(2) is not None: using += '::*'
-                usings.append(using)
+        usings = []
+        for m in cls.reGetAllUsings.finditer(strCppCode):
+            using = m.group(3)
+            if m.group(2) is not None: using += '::*'
+            usings.append(using)
         return usings
 
     @classmethod
@@ -442,31 +451,26 @@ class CppTextParser(object):
         # @TODO improve performance 
         # Reason: so far the code below is just a dirty hack 
         #         covering lack of typedef parsing in CppHeaderParser
-        filename = uml_pool.deployment.sources.abspath(data['location'])
-        with open (filename, "r") as fileToAnalyse:
-            # Remove C++ and C style comments and convert file in a 1 string
-            strFile = cls.reGetAllCStyleComments.sub("", cls.reGetCppStyleComments.sub("", fileToAnalyse.read())).replace('\n', ' ')
+        strCppCode = data['cpp_code']
             
-            for visibility in cls.visibility_types.keys():
-                for typedef in data['typedefs'][visibility]:
-                    # fix for "dirty" typedef name representation in CppHeaderParser 
-                    # if type-name follows closing template parameters without spacing
-                    if typedef[0] == '>': typedef = typedef[1:] 
+        for visibility in cls.visibility_types.keys():
+            for typedef in data['typedefs'][visibility]:
+                # fix for "dirty" typedef name representation in CppHeaderParser 
+                # if type-name follows closing template parameters without spacing
+                if typedef[0] == '>': typedef = typedef[1:] 
 
-                    # Filter out typedefs for function pointers
-                    # @TODO implement proper work arount typedefs for pointers 
-                    if cls.TypeParser.reFindId.search(typedef) is not None:
-                        m = re.search(cls.reTypedef.format(typedef), strFile)
-                        if m is not None:
-                            cls.handle_typedef(uml_pool, uml_class, name = typedef, 
-                                               type = m.group(2),
-                                               visibility = visibility,)
-                        else: 
-                            raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
-                    else:
-                        warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
-            del strFile
-
+                # Filter out typedefs for function pointers
+                # @TODO implement proper work arount typedefs for pointers 
+                if cls.TypeParser.reFindId.search(typedef) is not None:
+                    m = re.search(cls.reTypedef.format(typedef), strCppCode)
+                    if m is not None:
+                        cls.handle_typedef(uml_pool, uml_class, name = typedef, 
+                                           type = m.group(2),
+                                           visibility = visibility,)
+                    else: 
+                        raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
+                else:
+                    warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
 
         return uml_class
     

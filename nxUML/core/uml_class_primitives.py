@@ -90,7 +90,7 @@ class IUMLElement(object):
     """
     @property
     def id(self):
-        raise NotImplementedError('{0} elements are not identifiable'.format(type(self)))
+        raise NotImplementedError('{0} objects are not identifiable'.format(type(self)))
 
 ######################################################################
 class UMLNamedElement(IUMLElement):
@@ -114,7 +114,7 @@ class UMLRedefinableElement(UMLNamedElement):
 
 ######################################################################
 class UMLPackageableElement(IUMLElement):
-    """Container for named elements.
+    """An element that can be embedded into namespace.
     """
     def __init__(self, scope, **args):
         if scope is not None \
@@ -135,25 +135,45 @@ class UMLPackageableElement(IUMLElement):
 
 ######################################################################
 class UMLNamespace(UMLPackageableElement, UMLNamedElement):
+    """Container for named elements.
     """
-    """
-    def __init__(self, name, scope, subclasses = None, **args):
-        self.packages    = []
-        self.subclasses = [] if subclasses is None else subclasses
-        # self.subclass = []
+    def __init__(self, name, scope, named_elements = None, noname_elements = None, **args):
+        self.named_elements  = {} if  named_elements is None else named_elements
+        self.noname_elements = {} if noname_elements is None else noname_elements
         super(UMLNamespace, self).__init__(name=name, scope=scope, **args)
 
-    def add_subclass(self, classId):
-        self.subclasses.append(classId)
+    @property
+    def isRoot(self): return False
 
-    def add_package(self, packageId):
-        self.packages.append(packageId)
+    def add(self, uml_packageable_element):
+        if isinstance(uml_packageable_element, UMLNamedElement):
+            self.named_elements[uml_packageable_element.name] = uml_packageable_element
+
+    def __getitem__(self, name):
+        return self.named_elements[name]
+
+    def classes_iter(self, scope = ''):
+        """Iterate over the classes from the given namespace.
+        """
+        from nxUML.core.uml_class import UMLClass
+
+        for uml_class in self.named_elements.values():
+            if isinstance(uml_class, UMLClass):
+                yield (uml_class)
+
+    def packages_iter(self, scope = ''):
+        """Iterate over the packages from the given namespace.
+        """
+        from nxUML.core.uml_package import UMLPackage
+
+        for uml_package in self.named_elements.values():
+            if isinstance(uml_package, UMLPackage):
+                yield (uml_package)
 
     @property
     def id(self):
         scopeId = self.scope.id
         return ".".join((scopeId, self.name)) if scopeId and len(scopeId) > 0 else self.name
-        # return ".".join((self.scope.id, self.name)) 
 
     def rel_id(self, scope):
         scope_id = scope.id
@@ -179,3 +199,11 @@ class UMLTemplateableElement(UMLNamespace):
         if self.__dict__.has_key('_parameters') and self._parameters is not None: 
             return self._parameters
         else: return []
+
+######################################################################
+class UMLRootNamespace(UMLNamespace):
+    def __init__(self):
+        super(UMLNamespace, self).__init__(name='', scope=UMLElementRelativeName([]))
+
+    @property
+    def isRoot(self): return True

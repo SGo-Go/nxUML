@@ -170,7 +170,7 @@ class BrownieTextParser(CppTextParser):
             
         #uml_pool.Class[cls.TypeParser.cname2umlId(data['parent'])].add_subclass(data['name'])
         # print cls.TypeParser.parse_simple_scope(data['namespace']), data['name']
-        uml_pool.Class[cls.TypeParser.parse_simple_scope(data['namespace']).id].add_subclass(data['name'])
+        # uml_pool.Class[cls.TypeParser.parse_simple_scope(data['namespace']).id].add_subclass(data['name'])
 
     @classmethod
     def handle_generalization(cls, uml_pool, parent, child, **kwargs):

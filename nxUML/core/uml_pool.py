@@ -16,6 +16,7 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 # from nxUML.core.uml_datatype            import UMLDataTypeStub, UMLDataTypeDecorator
+from nxUML.core.uml_class_primitives    import UMLRootNamespace
 from nxUML.core.uml_class               import UMLClass, UMLInterface
 from nxUML.core.uml_class_relationships import *
 from nxUML.core.uml_artifacts           import *
@@ -37,11 +38,16 @@ class UMLPool(object):
     """Pool of classes with relationships between them
     """
     def __init__(self, name='', 
+                 root       = None,
                  deployment = None, 
                  deployment_class = UMLDeploymentPool, source_prefix = '',
                  **attr):
         """Constructor 
         """
+        if root is None: 
+            self.root = UMLRootNamespace()
+        else: self.root = root
+
         self.Class           = {}
         self.package         = {}
         self.Interface       = {}

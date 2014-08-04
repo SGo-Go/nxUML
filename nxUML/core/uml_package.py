@@ -36,31 +36,7 @@ class UMLPackage(UMLNamespace):
             xmlPackage.set('hrefId', self.id)
             xmlPackage.text = self.full_name
         else:
-            if root is None:
-                xmlPackage = etree.Element("package")
-            else: xmlPackage = etree.SubElement(root, "package")
-            xmlPackage.set('name', self.full_name)
-            xmlPackage.set('hrefId', self.id)
-        return xmlPackage
-
-
-class UMLRoot(UMLNamespace):
-
-    def __contains__(self, key):
-        return False # @TODO implement check
-
-    def __repr__(self):
-        return str(self.full_name)
-
-    def toXML(self, root = None, reference = False, scope = False):
-        from lxml import etree
-        if scope:
-            xmlPackage = etree.SubElement(root, "scope")
-            xmlPackage.set('name', self.name)
-            xmlPackage.set('hrefId', self.id)
-            xmlPackage.text = self.full_name
-        else:
-            if root is None:
+            if root is None: 
                 xmlPackage = etree.Element("package")
             else: xmlPackage = etree.SubElement(root, "package")
             xmlPackage.set('name', self.full_name)
