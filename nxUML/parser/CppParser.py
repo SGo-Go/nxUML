@@ -25,7 +25,7 @@ from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLMultiplicity
 from nxUML.core import UMLElementRelativeName, UMLDataTypeDecorator
 from nxUML.core import UMLPackage, UMLClass, UMLNamedPackageableElement
-from nxUML.core import UMLPrimitiveDataType, UMLSimpleDataType
+from nxUML.core import UMLPrimitiveDataType, UMLDataTypeStub
 from nxUML.core import UMLClassMethod, UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
@@ -253,13 +253,13 @@ class CppTypeParser(object):
                 uml_type = parameters[0]
                 uml_type.add_property(cls.specifier_types[name])
             else:
-                uml_base = UMLSimpleDataType(name, scope=scope, parameters = parameters)
+                uml_base = UMLDataTypeStub(name, scope=scope, parameters = parameters)
                 uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
         else:
             if name in cls.primitive_types.keys():
                 uml_base = cls.primitive_types[name]
             else:
-                uml_base = UMLSimpleDataType(cls.primitive_types.get(name, name), scope=scope)
+                uml_base = UMLDataTypeStub(cls.primitive_types.get(name, name), scope=scope)
             uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
 
         m = cls.reFindSuffixSpecifier.search(strType[currPointer:])
@@ -659,7 +659,7 @@ class CppTextParser(object):
                             embracing_scope, name_openings):
         """Resolve single name
         """
-        if isinstance(uml_type_base, UMLSimpleDataType):
+        if isinstance(uml_type_base, UMLDataTypeStub):
             path_to_try = [uml_type_base]
             for relpath in name_openings:
                 new_path = relpath.embed(uml_type_base)

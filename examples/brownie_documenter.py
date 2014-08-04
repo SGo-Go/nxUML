@@ -15,7 +15,7 @@
 """
 from brownie_parser import UMLBrownieCall,UMLBrownieNotification
 from nxUML.core import UMLPool, UMLPoolDocumenter, UMLClassDiagram, UMLClassRelationsGraph
-from nxUML.core import UMLPackage
+from nxUML.core import UMLPackage, UMLClass
 
 class BrowniePoolDocumenter(UMLPoolDocumenter):
     def source2XML(self, headerId):

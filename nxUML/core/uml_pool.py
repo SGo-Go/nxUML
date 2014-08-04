@@ -15,7 +15,8 @@ stored as networkx graph object.
 """
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
-from nxUML.core.uml_class_primitives    import UMLClass, UMLInterface, UMLSimpleDataType, UMLDataTypeDecorator
+# from nxUML.core.uml_datatype            import UMLDataTypeStub, UMLDataTypeDecorator
+from nxUML.core.uml_class               import UMLClass, UMLInterface
 from nxUML.core.uml_class_relationships import *
 from nxUML.core.uml_artifacts           import *
 from nxUML.core.uml_class_diag          import UMLClassRelationsGraph
