@@ -86,17 +86,6 @@ class UMLElementRelativeName(list):
 
 
 ######################################################################
-class UMLElementRelativeName(list):
-    """Relative scope. 
-    Used if the real scope is not known.
-    """
-    def __init__(self, init_values = []):
-        if hasattr(init_values, '__iter__'):
-            super(UMLElementRelativeName, self).__init__(init_values)
-        else: super(UMLElementRelativeName, self).__init__((init_values,))
-
-
-######################################################################
 class IUMLElement(object):
     @property
     def id(self):
@@ -123,6 +112,11 @@ class UMLPrimitiveDataType(IUMLDataType):
     @property
     def id(self): return self.name
     def __repr__(self): return self.name
+
+    def toXML(self, root = None, reference = False):
+        xmlType = super(UMLPrimitiveDataType, self).toXML(root, reference)
+        xmlType.set("type", "primitive")
+        return xmlType
 
 UMLInt       = UMLPrimitiveDataType('int')
 UMLBoolean   = UMLPrimitiveDataType('boolean')
@@ -369,8 +363,6 @@ class UMLSimpleDataType(UMLTemplateableElement, IUMLDataType):
                    parameters = '' if len(parameters) == 0 else '<%s>' % parameters)
 
     def toXML(self, root = None, reference = False):
-
-        from lxml import etree
         xmlType = IUMLDataType.toXML(self, root)
         if self.scope:
             xmlType.set("scope", self.scope.full_name)
@@ -418,6 +410,7 @@ class UMLDataTypeDecorator(IUMLElement):
         if isinstance(self.base, UMLClass):
             xmlType = UMLSimpleDataType(self.base.name, self.base.scope).toXML(root)
             xmlType.set("hrefId", self.base.id)
+            xmlType.set("type", "class")
         else: xmlType = self.base.toXML(root)
 
         if not self.composite:
@@ -438,6 +431,7 @@ class UMLClass(UMLNamedPackageableElement):
                  modifiers  = [],
                  subclasses = None,
                  parent   = None,):
+
         # Fill data
         self.location   = location
 
@@ -637,7 +631,6 @@ class UMLClassMethod:
     def is_abstract(self):
         return self._abstract
 
-
     @property
     def is_utility(self):
         return self._utility
@@ -670,6 +663,20 @@ class UMLClassMethod:
 
         xmlRetType      = etree.SubElement(xmlMethod, 'datatype')
         xmlRetType.text = self.rtnType
+
+        xmlRetType      = etree.SubElement(xmlMethod, 'parameters')
+        xmlRetType.text = self.rtnType
+
+        # xmlParams       = etree.SubElement(xmlMethod, 'parameters')
+        for paramId, parameter in zip(xrange(len(self.parameters)), self.parameters):
+            paramName, paramType = parameter
+            xmlParam      = etree.SubElement(xmlMethod, #xmlParams, 
+                                             'parameter')
+            xmlParam.set('id', str(paramId))
+            xmlParamType  = etree.SubElement(xmlParam, 'datatype')
+            xmlParam.text = paramName
+            xmlParamType.text = paramType
+
         # if self.rtnType is not None:
         #     xmlRetType      = self.rtnType.toXML(xmlMethod)
         return xmlMethod

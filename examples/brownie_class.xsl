@@ -92,12 +92,25 @@
       <h2><span id="attributes">Attributes</span></h2>
       <table class="table">
 	<tr>
-	  <th>Name</th>
 	  <th>Type</th>
+	  <th>Name</th>
 	  <th>Description</th>
 	</tr>
-	<xsl:apply-templates select="attribute"/>
-      </table>      
+	<xsl:copy>
+	  <tr><th colspan="3">Primitive [<xsl:number value="count(attribute[datatype[1]/@type='primitive'])"/>]</th></tr>
+	  <xsl:apply-templates select="attribute[datatype[1]/@type='primitive']">
+            <xsl:sort select="datatype[1]/text()" />
+          </xsl:apply-templates>
+	  <tr><th colspan="3">Simple [<xsl:number value="count(attribute[not(datatype[1]/@type)])"/>]</th></tr>
+	  <xsl:apply-templates select="attribute[not(datatype[1]/@type)]">
+            <xsl:sort select="datatype[1]/text()" />
+          </xsl:apply-templates>
+	  <tr><th colspan="3">Classes [<xsl:number value="count(attribute[datatype[1]/@type='class'])"/>]</th></tr>
+	  <xsl:apply-templates select="attribute[datatype[1]/@type='class']">
+            <xsl:sort select="datatype[1]/text()" />
+          </xsl:apply-templates>
+	</xsl:copy>
+      </table>
     </div>
   </xsl:template>
   <xsl:template match="class/attributes[not(attribute)]">
@@ -105,12 +118,12 @@
 
   <xsl:template match="class/attributes/attribute">
     <tr>
-      <td>
+      <td align="right" valign="top" width="25%">
+	<xsl:apply-templates select="datatype"/>
+      </td>
+      <td align="left" valign="top" width="25%">
 	<xsl:call-template name="show-visibility"/>
 	<code><xsl:value-of select="text()"/></code>
-      </td>
-      <td>
-	<xsl:apply-templates select="datatype"/>
       </td>
       <td>
 	<xsl:call-template name="show-description"/>
@@ -126,7 +139,9 @@
 	  <th>Return type</th>
 	  <th>Name</th>
 	</tr>
-	<xsl:apply-templates select="method"/>
+	<xsl:apply-templates select="method">
+          <xsl:sort select="text()" />
+        </xsl:apply-templates>
       </table>      
     </div>
   </xsl:template>
@@ -135,7 +150,7 @@
 
   <xsl:template match="class/methods/method">
     <tr>
-      <td>
+      <td align="right" valign="top" width="25%">
 	<xsl:apply-templates select="datatype"/>
       </td>
       <td>
@@ -150,12 +165,16 @@
 	      <xsl:value-of select="text()"/>
 	    </xsl:otherwise>
 	  </xsl:choose>
-	  </code>()
+	  </code>(<xsl:apply-templates select="parameter"/>)
 	<xsl:value-of select="@properties"/>
 	<br/>
 	<xsl:call-template name="show-description"/>
       </td>
     </tr>
+  </xsl:template>
+
+  <xsl:template match="class/methods/method/parameter">
+    <code><xsl:value-of select="text()"/></code> : <xsl:apply-templates select="datatype"/>, 
   </xsl:template>
 
   <xsl:template name="show-description">
@@ -366,7 +385,28 @@
     </xsl:if>
   </xsl:template>
 
+  <xsl:template match="scope">
+    <xsl:choose>
+      <xsl:when test="./@hrefId">
+    	<a>
+    	  <xsl:attribute name="href">
+    	    <xsl:value-of select="@hrefId" />.html
+    	  </xsl:attribute>
+    	  <xsl:value-of select="text()"/>
+    	</a>
+      </xsl:when>
+      <xsl:otherwise>
+	<xsl:value-of select="text()"/>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
+
+
   <!-- <xsl:call-template name="put-reference"/> -->
+
+  <!-- ************************************************** -->
+  <!-- Common icons -->
+  <!-- ************************************************** -->
 
   <xsl:template name="put-reference">
       <xsl:choose>
@@ -390,33 +430,33 @@
   <xsl:template name="show-visibility">
       <xsl:choose>
 	<xsl:when test="./@visibility = '-'">
-	  <img src="css/icons/privattr.gif" alt="-" />
+	  <span title='private'><img src="css/icons/privattr.gif" alt="-" /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '+'">
-	  <img src="css/icons/publattr.gif" alt="+" />
+	  <span title='public'><img src="css/icons/publattr.gif" alt="+" /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '#'">
-	  <img src="css/icons/protattr.gif" alt="#" />
+	  <span title='protected'><img src="css/icons/protattr.gif" alt="#" /></span>
 	</xsl:when>
 
 	<xsl:when test="./@visibility = '- '">
-	  <img src="css/icons/privoper.gif" alt="- " />
+	  <span title='private'><img src="css/icons/privoper.gif" alt="- " /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '+ '">
-	  <img src="css/icons/publoper.gif" alt="+ " />
+	  <span title='public'><img src="css/icons/publoper.gif" alt="+ " /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '# '">
-	  <img src="css/icons/protoper.gif" alt="# " />
+	  <span title='protected'><img src="css/icons/protoper.gif" alt="# " /></span>
 	</xsl:when>
 
 	<xsl:when test="./@visibility = '-/'">
-	  <img src="css/icons/virtprivoper.gif" alt="-/" />
+	  <span title='private virtual'><img src="css/icons/virtprivoper.gif" alt="-/" /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '+/'">
-	  <img src="css/icons/virtpubloper.gif" alt="+/" />
+	  <span title='public virtual'><img src="css/icons/virtpubloper.gif" alt="+/" /></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '#/'">
-	  <img src="css/icons/virtprotoper.gif" alt="#/" />
+	  <span title='protected virtual'><img src="css/icons/virtprotoper.gif" alt="#/" /></span>
 	</xsl:when>
 
 	<xsl:otherwise>
@@ -429,15 +469,21 @@
     <xsl:for-each select="multiplicity">
       <xsl:choose>
 	<xsl:when test="./@type = 'pointer'">
-	  <img src="css/icons/pointer.gif" alt="&#x27AE;" /><!-- &#x21B3 x27AE-->
+	  <span title='pointer'><img src="css/icons/pointer.gif" alt="&#x27AE;" /></span><!-- &#x21B3 x27AE-->
 	</xsl:when>
 
 	<xsl:when test="./@type = 'reference'">
-	  <img src="css/icons/reference.png" alt="&amp;" />
+	  <span title='reference'><img src="css/icons/reference.png" alt="&amp;" /></span>
 	</xsl:when>
 
 	<xsl:when test="./@type = 'quantifier'">
-	  <img src="css/icons/qualifier.gif" alt="&#x272A;" /> <!-- 2605 -->
+	  <span>
+	    <xsl:attribute name="title">
+    	      quantifier:
+	      <xsl:value-of select="./@bind"/>(key=<xsl:value-of select="./@key"/>)
+    	    </xsl:attribute>
+	    <img src="css/icons/qualifier.gif" alt="&#x272A;" />
+	  </span> <!-- 2605 -->
 	  <sup><b><xsl:value-of select="./@bind"/></b>(key=<xsl:value-of select="./@key"/>)</sup>
 	</xsl:when>
 
@@ -446,22 +492,6 @@
 	</xsl:otherwise>
       </xsl:choose>
     </xsl:for-each>
-  </xsl:template>
-
-  <xsl:template match="scope">
-    <xsl:choose>
-      <xsl:when test="./@hrefId">
-    	<a>
-    	  <xsl:attribute name="href">
-    	    <xsl:value-of select="@hrefId" />.html
-    	  </xsl:attribute>
-    	  <xsl:value-of select="text()"/>
-    	</a>
-      </xsl:when>
-      <xsl:otherwise>
-	<xsl:value-of select="text()"/>
-      </xsl:otherwise>
-    </xsl:choose>
   </xsl:template>
 
 </xsl:stylesheet>

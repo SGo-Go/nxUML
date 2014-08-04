@@ -303,9 +303,15 @@ class CppTextParser(object):
     reGetAllUsings = re.compile(r"(\s|;|\}})using\s+(namespace)?\s+(({0}\s*::\s*)*{0})\s*;".format(TypeParser.reId), re.DOTALL)
 
     @classmethod
-    def parse(cls, filename, uml_pool = None, include_paths = []):
+    def parse(cls, filename, 
+              uml_pool = None, 
+              include_paths = [], 
+              hash_type = None):
         if uml_pool is None: uml_pool = UMLPool()
 
+        ########################################
+        # Parse codes
+        ########################################
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
@@ -315,28 +321,43 @@ class CppTextParser(object):
         #     (usings are not supported by CppParseHeader)
         usings = cls.find_open_scopes(filename)
 
+        ########################################
+        # Fill-up artifact for the header file 
+        ########################################
         uml_source = cls.create_source_artifact(uml_pool, filename# cppHeader.headerFileName
                                                 , constructor = UMLSourceFile
                                                 , local = True)
         uml_pool.deployment.sources.add(uml_source, forced = True)
         sourceId = uml_source.id
         
-        source_folder = os.path.join(uml_pool.deployment.sources.source_prefix, 
-                                     uml_source.folder)
+        if hash_type is not None:
+            import hashlib
+            uml_source.hash = (hash_type,
+                               eval("hashlib.{0}(open(filename, 'r').read()).digest()".format(hash_type)))
 
+        ########################################
+        # Walk through definitions in the header
+        ########################################
+
+        # Handle usings 
         for using in usings:
             cls.handle_using(uml_pool, name = using, 
                              location = sourceId)
 
+        # Handle namespace
         for namespace in cppHeader.namespaces:
             cls.handle_package(uml_pool, name = str(namespace), 
                                location = sourceId)
 
+        # Handle includes
+        source_folder = os.path.join(uml_pool.deployment.sources.source_prefix, 
+                                     uml_source.folder)
         all_include_paths = [source_folder] + list(include_paths)
         for sourceFile in cppHeader.includes:
             cls.handle_include(uml_pool, sourceId = sourceId, include_name=sourceFile, 
                                include_paths = all_include_paths)
 
+        # Handle classes
         for className in cppHeader.classes:
             classData = cppHeader.classes[className]
             if classData['parent'] is None:
@@ -349,6 +370,7 @@ class CppTextParser(object):
                                  **cppHeader.classes[className])
                 del subclasses
 
+        # Free memory and return reference on include artifact
         del cppHeader
         return uml_source
 
