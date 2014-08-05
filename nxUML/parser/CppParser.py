@@ -317,8 +317,9 @@ class CppTextParser(object):
         except CppHeaderParser.CppParseError as e: raise e
 
         # @TODO improve performance 
-        # Note: dirty hack
-        #    Brute search and analysis of elements whish are not pppparsed by CppHeaderParser
+        # Reason: so far the code below is just a dirty hack 
+        #         covering lack of typedef parsing in CppHeaderParser
+        # I.e. brute search and analysis of elements which are not pparsed by CppHeaderParser
         strCppCode = ""
         with open(filename, "r") as fileToAnalyse:
             # Remove C++ and C style comments and convert file in a 1 string
@@ -329,6 +330,27 @@ class CppTextParser(object):
             #     Use find_open_scopes to find all usings 
             #     (usings are not supported by CppParseHeader)
             usings = cls.find_open_scopes(strCppCode)
+
+            # Work around class typedefs : compute typedefs table
+            typedefs_table = {}
+            for className in cppHeader.classes:
+                data = cppHeader.classes[className]
+                for visibility in cls.visibility_types.keys():
+                    for typedef in data['typedefs'][visibility]:
+                        # fix for "dirty" typedef name representation in CppHeaderParser 
+                        # if type-name follows closing template parameters without spacing
+                        if typedef[0] == '>': typedef = typedef[1:] 
+
+                        # Filter out typedefs for function pointers
+                        # @TODO implement proper work arount typedefs for pointers 
+                        if cls.TypeParser.reFindId.search(typedef) is not None:
+                            m = re.search(cls.reTypedef.format(typedef), strCppCode)
+                            if m is not None:
+                                typedefs_table[typedef] = m.group(2)
+                            else: 
+                                raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
+                        else:
+                            warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
 
         ########################################
         # Fill-up artifact for the header file 
@@ -373,11 +395,13 @@ class CppTextParser(object):
             if classData['parent'] is None:
                 subclasses = dict([(name,data) \
                                        for name, data in cppHeader.classes.items() \
-                                       if data['parent'] == className])
+                                       if  data['parent'] == className])
                 cls.handle_class(uml_pool, 
                                  location       = sourceId,
                                  subclasses     = subclasses,
                                  cpp_code       = strCppCode,
+                                 typedefs_table = typedefs_table,
+                                 parsed_header  = cppHeader,
                                  **cppHeader.classes[className])
                 del subclasses
 
@@ -448,30 +472,19 @@ class CppTextParser(object):
         else: uml_source.classes = [uml_class.id]
 
         # Work around class typedefs 
-        # @TODO improve performance 
-        # Reason: so far the code below is just a dirty hack 
-        #         covering lack of typedef parsing in CppHeaderParser
-        strCppCode = data['cpp_code']
-            
+        typedefs_table = data['typedefs_table']
         for visibility in cls.visibility_types.keys():
             for typedef in data['typedefs'][visibility]:
                 # fix for "dirty" typedef name representation in CppHeaderParser 
                 # if type-name follows closing template parameters without spacing
                 if typedef[0] == '>': typedef = typedef[1:] 
 
-                # Filter out typedefs for function pointers
-                # @TODO implement proper work arount typedefs for pointers 
-                if cls.TypeParser.reFindId.search(typedef) is not None:
-                    m = re.search(cls.reTypedef.format(typedef), strCppCode)
-                    if m is not None:
-                        cls.handle_typedef(uml_pool, uml_class, name = typedef, 
-                                           type = m.group(2),
-                                           visibility = visibility,)
-                    else: 
-                        raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
-                else:
-                    warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
-
+                # Filter out non-found typedefs
+                if typedefs_table.has_key(typedef):
+                    cls.handle_typedef(uml_pool, uml_class, name = typedef, 
+                                       type = typedefs_table[typedef],
+                                       visibility = visibility,)
+                    # print typedef, typedefs_table[typedef]
         return uml_class
     
     @classmethod

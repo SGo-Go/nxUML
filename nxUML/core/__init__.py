@@ -10,6 +10,8 @@ Project       nxUML
 @author       Sergiy Gogolenko
 
 Init-file for folder with core nxUML classes.
+Majority of class hierarchy elements follows instructions presented in
+http://www.uml-diagrams.org/uml-core.html
 ######################################################################
 """
 from nxUML.core.debug import debug,warning,error
