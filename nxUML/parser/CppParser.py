@@ -147,6 +147,15 @@ class CppTypeParser(object):
         return uml_scope
 
     @classmethod
+    def split_name(cls, cpp_name):
+        """Splits C++ full name on name and namespace
+        """
+        cpp_name_parts = cpp_name.rsplit('::', 1)
+        if(len(cpp_name_parts) > 1):
+            return cpp_name_parts[1], cpp_name_parts[0]
+        else: return cpp_name_parts[0], None
+
+    @classmethod
     def parse(cls, strType):
         parsedType, ptr = cls.parse_from_pointer(str(strType), 0)
         if not cls.reCheckEmpty.match(strType[ptr:]) : 
@@ -312,17 +321,35 @@ class CppTextParser(object):
         ########################################
         # Parse codes
         ########################################
+
+        # Pre-parsing by external package CppHeaderParser
         import CppHeaderParser
         try: cppHeader = CppHeaderParser.CppHeader(filename)
         except CppHeaderParser.CppParseError as e: raise e
 
+
+        # Fill up classes table
+        classes_table = {}
+        for className, classData in cppHeader.classes.items():
+            if classData['namespace'] is None: name = classData['name']
+            else: name = '::'.join((classData['namespace'], classData['name']))
+            classes_table[name] = classData
+
+        # Fill up packages (C++ namespaces) table
+        packages_table = {}
+        for namespace in cppHeader.namespaces:
+            name, holder = cls.TypeParser.split_name(namespace)
+            packages_table[namespace] = {'name': name, 'namespace': holder}
+
+        # Parse codes which are not processed by CppHeaderParser
         # @TODO improve performance 
         # Reason: so far the code below is just a dirty hack 
         #         covering lack of typedef parsing in CppHeaderParser
         # I.e. brute search and analysis of elements which are not pparsed by CppHeaderParser
         strCppCode = ""
+        typedefs_table = {} # Create typedefs table regardless of succes in filename opening
         with open(filename, "r") as fileToAnalyse:
-            # Remove C++ and C style comments and convert file in a 1 string
+            # Remove C++ and C style comments and convert file in a single string
             strCppCode = cls.reGetAllCStyleComments.sub \
                 ("", cls.reGetCppStyleComments.sub \
                      ("", fileToAnalyse.read())).replace('\n', ' ')
@@ -332,13 +359,13 @@ class CppTextParser(object):
             usings = cls.find_open_scopes(strCppCode)
 
             # Work around class typedefs : compute typedefs table
-            typedefs_table = {}
-            for className in cppHeader.classes:
-                data = cppHeader.classes[className]
+            for className, data in classes_table.items():
                 for visibility in cls.visibility_types.keys():
                     for typedef in data['typedefs'][visibility]:
-                        # fix for "dirty" typedef name representation in CppHeaderParser 
-                        # if type-name follows closing template parameters without spacing
+                        # @Dirty hack:
+                        #   Fix for "dirty" typedef representation by names 
+                        #   without specification of content in CppHeaderParser 
+                        #   if type-name follows closing template parameters without spacing
                         if typedef[0] == '>': typedef = typedef[1:] 
 
                         # Filter out typedefs for function pointers
@@ -346,11 +373,25 @@ class CppTextParser(object):
                         if cls.TypeParser.reFindId.search(typedef) is not None:
                             m = re.search(cls.reTypedef.format(typedef), strCppCode)
                             if m is not None:
-                                typedefs_table[typedef] = m.group(2)
+                                typedefs_table['::'.join((className, typedef))] = {\
+                                    'name' : typedef,
+                                    'namespace': className,
+                                    'type' : m.group(2),
+                                    'visibility': visibility, 
+                                    }
                             else: 
                                 raise ValueError('Parsing error: cannot parse typedef "%s"' % typedef)
                         else:
                             warning('Parser ignore typedef for function pointer "%s" in "%s"' % (typedef, filename))
+
+
+            # for className, classData in classes_table.items():
+            #     classData['classes'] = \
+            #         [name for name, data in classes_table.items() if data['namespace'] == className]
+
+        parse_table = {'typedefs' : typedefs_table, 
+                       'packages' : packages_table,
+                       'classes'  : classes_table}
 
         ########################################
         # Fill-up artifact for the header file 
@@ -367,6 +408,12 @@ class CppTextParser(object):
             uml_source.hash = (hash_type,
                                eval("hashlib.{0}(open(filename, 'r').read()).digest()".format(hash_type)))
 
+        # Use artifact as manifestation anchor for classes and packages
+        for className, classData in classes_table.items():
+            classData['sourceId'] = sourceId
+        for packageName, packageData in packages_table.items():
+            packageData['sourceId'] = sourceId
+
         ########################################
         # Walk through definitions in the header
         ########################################
@@ -374,12 +421,7 @@ class CppTextParser(object):
         # Handle usings 
         for using in usings:
             cls.handle_using(uml_pool, name = using, 
-                             location = sourceId)
-
-        # Handle namespace
-        for namespace in cppHeader.namespaces:
-            cls.handle_package(uml_pool, name = str(namespace), 
-                               location = sourceId)
+                             sourceId = sourceId)
 
         # Handle includes
         source_folder = os.path.join(uml_pool.deployment.sources.source_prefix, 
@@ -389,21 +431,26 @@ class CppTextParser(object):
             cls.handle_include(uml_pool, sourceId = sourceId, include_name=sourceFile, 
                                include_paths = all_include_paths)
 
-        # Handle classes
-        for className in cppHeader.classes:
-            classData = cppHeader.classes[className]
-            if classData['parent'] is None:
-                subclasses = dict([(name,data) \
-                                       for name, data in cppHeader.classes.items() \
-                                       if  data['parent'] == className])
-                cls.handle_class(uml_pool, 
-                                 location       = sourceId,
-                                 subclasses     = subclasses,
-                                 cpp_code       = strCppCode,
-                                 typedefs_table = typedefs_table,
-                                 parsed_header  = cppHeader,
-                                 **cppHeader.classes[className])
-                del subclasses
+        # Run recursive namespace tree building from global namespace
+        # Handle global namespace as root package
+        cls.handle_packageable(uml_pool, uml_pool.root, None, parse_table)
+
+        # # Handle classes
+        # for className in classes_table:
+        #     classData = classes_table[className]
+        #     if classData['parent'] is None:
+        #         # print '@@', className, classData['namespace']
+        #         subclasses = dict([(name,data) \
+        #                                for name, data in classes_table.items() \
+        #                                if  data['parent'] == className])
+        #         cls.handle_class(uml_pool, 
+        #                          location       = sourceId,
+        #                          subclasses     = subclasses,
+        #                          cpp_code       = strCppCode,
+        #                          typedefs_table = typedefs_table,
+        #                          parsed_header  = cppHeader,
+        #                          **classes_table[className])
+        #         del subclasses
 
         # Free memory and return reference on include artifact
         del cppHeader
@@ -412,7 +459,7 @@ class CppTextParser(object):
 
     @classmethod
     def find_open_scopes(cls, strCppCode, uml_pool = None, include_paths = []):
-        # filename = uml_pool.deployment.sources.abspath(data['location'])
+        # filename = uml_pool.deployment.sources.abspath(data['manifestation'])
         usings = []
         for m in cls.reGetAllUsings.finditer(strCppCode):
             using = m.group(3)
@@ -421,17 +468,44 @@ class CppTextParser(object):
         return usings
 
     @classmethod
-    def create_class(cls, uml_pool, **data):
+    def handle_packageable(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
+        """Walk throung components of namespace and register them if required
+        """
+        for className, classData in parse_table['classes'].items():
+            if classData['namespace'] == cpp_fullname:
+                uml_class = cls.handle_class(uml_pool, uml_namespace, className, parse_table, **classData)
+                if uml_class: uml_namespace.add(uml_class)
+
+        for packageName, packageData in parse_table['packages'].items():
+            if packageData['namespace'] == cpp_fullname:
+                uml_package = cls.handle_package(uml_pool, uml_namespace, packageName, parse_table, **packageData)
+                if uml_package: uml_namespace.add(uml_namespace)
+
+        # Work around class typedefs 
+        for typeName, typeData in parse_table['typedefs'].items():
+            if typeData['namespace'] == cpp_fullname:
+                # debug(typeData['name'], cpp_fullname)
+                uml_type = cls.handle_typedef(uml_pool, uml_namespace, **typeData)
+                if uml_type: uml_namespace.add(uml_namespace)
+
+    @classmethod
+    def create_package(cls, uml_pool, uml_namespace, parse_table, **data):
+        uml_pckg  = UMLPackage(name = data['name'], scope = uml_namespace)
+        return uml_pckg
+
+    @classmethod
+    def create_class(cls, uml_pool, uml_namespace, parse_table, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
-                             scope     = cls.TypeParser.parse_simple_scope(data['namespace']), #str(data['namespace']).replace('::', '.'),
-                             location  = data['location'], #cls.location2url(data['location']), @TODO url 
+                             scope     = cls.TypeParser.parse_simple_scope(data['namespace']), 
+                             manifestation = data['sourceId'], 
                              methods   = [],
                              attribs   = [],
                              modifiers = [],
                              parent    = data['parent'],)
 
         # Work around inheritances of class
+        # @TODO: Move it to a propper place
         # Caution: it includes hack for improper 
         #        handling of templated inheritances in CppHeaderParser
         new_generalization  = True
@@ -466,25 +540,11 @@ class CppTextParser(object):
 
         
         # Register parsed class as a component of source
-        uml_source = uml_pool.deployment.source(uml_class.location)
+        uml_source = uml_pool.deployment.source(uml_class.manifestation)
         if uml_source.__dict__.has_key('classes'):
             uml_source.classes.append(uml_class.id)
         else: uml_source.classes = [uml_class.id]
 
-        # Work around class typedefs 
-        typedefs_table = data['typedefs_table']
-        for visibility in cls.visibility_types.keys():
-            for typedef in data['typedefs'][visibility]:
-                # fix for "dirty" typedef name representation in CppHeaderParser 
-                # if type-name follows closing template parameters without spacing
-                if typedef[0] == '>': typedef = typedef[1:] 
-
-                # Filter out non-found typedefs
-                if typedefs_table.has_key(typedef):
-                    cls.handle_typedef(uml_pool, uml_class, name = typedef, 
-                                       type = typedefs_table[typedef],
-                                       visibility = visibility,)
-                    # print typedef, typedefs_table[typedef]
         return uml_class
     
     @classmethod
@@ -548,23 +608,32 @@ class CppTextParser(object):
         uml_class.add_method(uml_method)
 
     @classmethod
-    def handle_typedef(cls, uml_pool, uml_holder, **kwargs):
+    def handle_typedef(cls, uml_pool, uml_namespace, **data):
         pass
 
     @classmethod
-    def handle_subclass(cls, uml_pool, **data):
-        cls.handle_class(uml_pool, **data)
-
-    @classmethod
-    def handle_class(cls, uml_pool, **data):
-        uml_class = cls.create_class(uml_pool, **data)
+    def handle_class(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
+        # debug(cpp_fullname)
+        uml_class = cls.create_class(uml_pool, uml_namespace, parse_table, **data)
         uml_pool.add_class(uml_class)
 
-        # Work around subclasses
-        if data.has_key('subclasses') and len(data['subclasses']) > 0:
-            for className, classData in data['subclasses'].items():
-                cls.handle_subclass(uml_pool, location = data['location'], **classData)
+        # Handle internal classes and types
+        cls.handle_packageable(uml_pool, uml_class, cpp_fullname, parse_table, **data)
+        return uml_class
 
+    @classmethod
+    def handle_package(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
+        # debug(cpp_fullname)
+        uml_package = cls.create_package(uml_pool, uml_namespace, parse_table, **data)
+
+        # Register package in the pool if required
+        if uml_pool.package.has_key(uml_package.id):
+            uml_package = uml_pool.package[uml_package.id]
+        else: uml_pool.add_package(uml_package)
+
+        # Handle internal classes and types
+        cls.handle_packageable(uml_pool, uml_package, cpp_fullname, parse_table, **data)
+        return uml_package
 
     @classmethod
     def handle_generalization(cls, uml_pool, parent, child, **kwargs):
@@ -578,6 +647,20 @@ class CppTextParser(object):
         # url = "file://localhost/" + filename.replace("\\", "/")
         # url = urlparse.urlunparse(urlparse.urlparse(filename)._replace(scheme='file'))
         return url
+
+    ############################################################
+    # Artifacts filling 
+    ############################################################
+
+    @classmethod
+    def create_source_artifact(cls, uml_pool, filename, constructor = UMLSourceFile, **data):
+        folder = os.path.dirname(filename)
+        name, ext = os.path.splitext(os.path.basename(filename))
+        uml_source = constructor(name, ext=ext, folder=folder,
+                                 # stereotype = 'C++ header',
+                                 local = data['local'])
+        uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
+        return uml_source
 
     @classmethod
     def handle_include(cls, uml_pool, sourceId = None, include_name = '""', 
@@ -603,35 +686,11 @@ class CppTextParser(object):
         uml_pool.deployment.sources.add_edge(sourceId, uml_source.id)
 
     @classmethod
-    def create_source_artifact(cls, uml_pool, filename, constructor = UMLSourceFile, **data):
-        folder = os.path.dirname(filename)
-        name, ext = os.path.splitext(os.path.basename(filename))
-        uml_source = constructor(name, ext=ext, folder=folder,
-                                 # stereotype = 'C++ header',
-                                 local = data['local'])
-        uml_source.remove_prefix(uml_pool.deployment.sources.source_prefix)
-        return uml_source
-
-    @classmethod
-    def handle_package(cls, uml_pool, name = '', **data):
-        # pckgAsType = cls.TypeParser.parse(name).base
-        # uml_pckg   = UMLPackage(name = pckgAsType.name, scope = pckgAsType.scope)
-        pckgScope = cls.TypeParser.parse_simple_scope(name)
-        pckgName  = pckgScope.pop()
-        # pckgScopeId = pckgScope.id
-        # if uml_pool.package.has_key(pckgScopeId):
-        #     pckgScope = uml_pool.package[pckgScopeId]
-
-        uml_pckg  = UMLPackage(name = pckgName, scope = pckgScope)
-        if uml_pool.package.has_key(uml_pckg.id):
-            uml_pckg = uml_pool.package[uml_pckg.id]
-        else: uml_pool.add_package(uml_pckg)
-            
-    @classmethod
-    def handle_using(cls, uml_pool, name, location = None, **data):
-        if location is not None:
+    def handle_using(cls, uml_pool, name, sourceId = None, **data):
+        if sourceId is not None:
             uml_relname = cls.TypeParser.parse_simple_scope(name)
-            uml_pool.deployment.source(location).open_names.append(uml_relname)
+            uml_pool.deployment.source(sourceId).open_names.append(uml_relname)
+
 
     @classmethod
     def resolve_names(cls, uml_pool):
@@ -651,12 +710,12 @@ class CppTextParser(object):
         for classId, classItem in uml_pool.Class.items():
             classScopeId = classItem.scope.id
             if isinstance(classItem.scope, UMLElementRelativeName) \
-                    and hasElementWithId(classScopeId) :
+                    and hasElementWithId(classScopeId):
                 classItem.scope = getElementById(uml_pool, classScopeId)
 
             
             # Reviel relevant usings for name resolution 
-            name_openings = cls.get_name_openings(uml_pool, classItem.location)
+            name_openings = cls.get_name_openings(uml_pool, classItem.manifestation)
 
             # Resolve names for attributes taking into account usings
             for attrib in classItem.attributes:

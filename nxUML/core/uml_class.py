@@ -23,7 +23,7 @@ class UMLClass(UMLClassifier):
     """Unified (language independent) representation of class
     """
     def __init__(self, name, 
-                 location = None, 
+                 manifestation = None, 
                  scope  = None,
                  methods  = [],
                  attribs  = [],
@@ -32,7 +32,7 @@ class UMLClass(UMLClassifier):
                  parent   = None,):
 
         # Fill data
-        self.location   = location
+        self.manifestation = manifestation
 
         self._modifiers = modifiers
         self.methods    = methods
@@ -147,8 +147,8 @@ class UMLClass(UMLClassifier):
             if self.scope is not None:
                 xmlClass.set("scope", self.scope.full_name)
 
-            if len(self.location)>0:
-                xmlClass.set("location", self.location)
+            if len(self.manifestation)>0:
+                xmlClass.set("manifestation", self.manifestation)
 
             xmlAttribs      = etree.SubElement(xmlClass, "attributes")
             for attrib in self.attributes:

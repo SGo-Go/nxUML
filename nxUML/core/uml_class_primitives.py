@@ -203,7 +203,7 @@ class UMLTemplateableElement(UMLNamespace):
 ######################################################################
 class UMLRootNamespace(UMLNamespace):
     def __init__(self):
-        super(UMLNamespace, self).__init__(name='', scope=UMLElementRelativeName([]))
+        super(UMLRootNamespace, self).__init__(name='', scope=UMLElementRelativeName([]))
 
     @property
     def isRoot(self): return True
