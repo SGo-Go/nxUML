@@ -86,6 +86,8 @@ class CppTypeParser(object):
         # Only functions 
         # @TODO  fix this bug in CppParseHeader
         'inline'  : 'inline',
+
+        'union'   : 'union',
         }
 
 
@@ -433,7 +435,7 @@ class CppTextParser(object):
 
         # Run recursive namespace tree building from global namespace
         # Handle global namespace as root package
-        cls.handle_packageable(uml_pool, uml_pool.root, None, parse_table)
+        cls.handle_packageables(uml_pool, uml_pool.root, None, parse_table)
 
         # # Handle classes
         # for className in classes_table:
@@ -468,8 +470,9 @@ class CppTextParser(object):
         return usings
 
     @classmethod
-    def handle_packageable(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
-        """Walk throung components of namespace and register them if required
+    def handle_packageables(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
+        """Recursively walk throung components of namespace and register them if required.
+        Order: classes > packages > typedefs.
         """
         for className, classData in parse_table['classes'].items():
             if classData['namespace'] == cpp_fullname:
@@ -479,25 +482,25 @@ class CppTextParser(object):
         for packageName, packageData in parse_table['packages'].items():
             if packageData['namespace'] == cpp_fullname:
                 uml_package = cls.handle_package(uml_pool, uml_namespace, packageName, parse_table, **packageData)
-                if uml_package: uml_namespace.add(uml_namespace)
+                if uml_package: uml_namespace.add(uml_package)
 
         # Work around class typedefs 
         for typeName, typeData in parse_table['typedefs'].items():
             if typeData['namespace'] == cpp_fullname:
                 # debug(typeData['name'], cpp_fullname)
                 uml_type = cls.handle_typedef(uml_pool, uml_namespace, **typeData)
-                if uml_type: uml_namespace.add(uml_namespace)
+                if uml_type: uml_namespace.add(uml_type)
 
     @classmethod
     def create_package(cls, uml_pool, uml_namespace, parse_table, **data):
-        uml_pckg  = UMLPackage(name = data['name'], scope = uml_namespace)
-        return uml_pckg
+        uml_package  = UMLPackage(name = data['name'], scope = uml_namespace)
+        return uml_package
 
     @classmethod
     def create_class(cls, uml_pool, uml_namespace, parse_table, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
-                             scope     = cls.TypeParser.parse_simple_scope(data['namespace']), 
+                             scope     = uml_namespace, 
                              manifestation = data['sourceId'], 
                              methods   = [],
                              attribs   = [],
@@ -519,9 +522,7 @@ class CppTextParser(object):
                                 gener_link['class'] != '>' else '') + gener_link['class']
             if parent_name.count('<') == parent_name.count('>'):
                 new_generalization = True
-                cls.handle_generalization(uml_pool, 
-                                          parent = cls.TypeParser.parse(parent_name).base, 
-                                          child  = uml_class,
+                cls.handle_generalization(uml_pool, uml_class, cls.TypeParser.parse(parent_name).base, 
                                           **gener_link_data)
 
         # Work around class attributes
@@ -589,13 +590,17 @@ class CppTextParser(object):
         return uml_method
 
     @classmethod
-    def create_generalization(cls, parent, child, **kwargs):
+    def create_generalization(cls, child, parent, **kwargs):
         visibility = cls.visibility_types.get(kwargs['access'], ' ')
         visibility+= '/' if kwargs['virtual'] else ' '
-        uml_generalization = UMLGeneralization(parent  = parent,
-                                               child   = child,
+        uml_generalization = UMLGeneralization(parent     = parent,
+                                               child      = child,
                                                visibility = visibility,)
         return uml_generalization
+
+    ############################################################
+    # Handles for class components
+    ############################################################
 
     @classmethod
     def handle_attribute(cls, uml_class, **kwargs):
@@ -607,18 +612,19 @@ class CppTextParser(object):
         uml_method = cls.create_method(**kwargs)
         uml_class.add_method(uml_method)
 
-    @classmethod
-    def handle_typedef(cls, uml_pool, uml_namespace, **data):
-        pass
+    ############################################################
+    # Handles for packageable elements 
+    ############################################################
 
     @classmethod
     def handle_class(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
         # debug(cpp_fullname)
         uml_class = cls.create_class(uml_pool, uml_namespace, parse_table, **data)
-        uml_pool.add_class(uml_class)
+        # uml_pool.add_class(uml_class) #@TODO
+        uml_namespace.add(uml_class)
 
         # Handle internal classes and types
-        cls.handle_packageable(uml_pool, uml_class, cpp_fullname, parse_table, **data)
+        cls.handle_packageables(uml_pool, uml_class, cpp_fullname, parse_table, **data)
         return uml_class
 
     @classmethod
@@ -627,18 +633,34 @@ class CppTextParser(object):
         uml_package = cls.create_package(uml_pool, uml_namespace, parse_table, **data)
 
         # Register package in the pool if required
-        if uml_pool.package.has_key(uml_package.id):
-            uml_package = uml_pool.package[uml_package.id]
-        else: uml_pool.add_package(uml_package)
+        # Note: in C++ package can be defined independently in multiple places
+        #     even inside a single file, not saying several files
+        if uml_namespace.name == uml_package.name: raise
+        if uml_namespace.named_elements.has_key(uml_package.name):
+            uml_package = uml_namespace.named_elements[uml_package.name] 
+        else: uml_namespace.add(uml_package)
+        # if uml_pool.package.has_key(uml_package.id):
+        #     uml_package = uml_pool.package[uml_package.id]
+        # else: uml_pool.add_package(uml_package)  #@TODO
 
         # Handle internal classes and types
-        cls.handle_packageable(uml_pool, uml_package, cpp_fullname, parse_table, **data)
+        cls.handle_packageables(uml_pool, uml_package, cpp_fullname, parse_table, **data)
         return uml_package
 
     @classmethod
-    def handle_generalization(cls, uml_pool, parent, child, **kwargs):
-        uml_generalization = cls.create_generalization(parent, child, **kwargs)
-        uml_pool.add_relationship(uml_generalization)
+    def handle_typedef(cls, uml_pool, uml_namespace, **data):
+        return None
+
+    ############################################################
+    # Handles for relationships
+    ############################################################
+
+    @classmethod
+    def handle_generalization(cls, uml_pool, child, parent, **kwargs):
+        uml_generalization = cls.create_generalization(child, parent, **kwargs)
+        # uml_pool.add_relationship(uml_generalization)
+        child.add_relationship(uml_generalization)
+        return uml_generalization
 
     @classmethod
     def location2url(cls, localpath):
@@ -694,41 +716,43 @@ class CppTextParser(object):
 
     @classmethod
     def resolve_names(cls, uml_pool):
-        idTypes = dict(map(lambda name: (name,'package'), uml_pool.package.keys()) +
-                       map(lambda name: (name,'Class'), uml_pool.Class.keys()))
-        getElementById = lambda uml_pool, idType: \
-            eval('uml_pool.{0}[idType]'.format(idTypes[idType]))
-        hasElementWithId = lambda idType: idTypes.has_key(idType)
+        # idTypes = dict(map(lambda name: (name,'package'), uml_pool.package.keys()) +
+        #                map(lambda name: (name,'Class'), uml_pool.Class.keys()))
+        # getElementById = lambda uml_pool, idType: \
+        #     eval('uml_pool.{0}[idType]'.format(idTypes[idType]))
+        # hasElementWithId = lambda idType: idTypes.has_key(idType)
 
-        # Loop over packages
-        for pckgId, pckgItem in uml_pool.package.items():
-            pckgScopeId = pckgItem.scope.id
-            if hasElementWithId(pckgScopeId) :
-                pckgItem.scope = getElementById(uml_pool, pckgScopeId)
+        # # Loop over packages
+        # for pckgId, pckgItem in uml_pool.package.items():
+        #     pckgScopeId = pckgItem.scope.id
+        #     if hasElementWithId(pckgScopeId) :
+        #         pckgItem.scope = getElementById(uml_pool, pckgScopeId)
 
         # Loop over classes
-        for classId, classItem in uml_pool.Class.items():
-            classScopeId = classItem.scope.id
-            if isinstance(classItem.scope, UMLElementRelativeName) \
-                    and hasElementWithId(classScopeId):
-                classItem.scope = getElementById(uml_pool, classScopeId)
-
+        for uml_class in uml_pool.dfs_iter():
+            if not isinstance(uml_class, UMLClass): continue
+            classScopeId = uml_class.scope.id
             
             # Reviel relevant usings for name resolution 
-            name_openings = cls.get_name_openings(uml_pool, classItem.manifestation)
+            name_openings = cls.get_name_openings(uml_pool, uml_class.manifestation)
 
             # Resolve names for attributes taking into account usings
-            for attrib in classItem.attributes:
+            for attrib in uml_class.attributes:
                 attrib.type.base = cls.resolve_simple_type(uml_pool, attrib.type.base, 
-                                                           classItem, name_openings)
+                                                           uml_class, name_openings)
+                # print type(attrib.type.base)
 
-        # Loop over relationships
-        for uml_relationship in uml_pool.relationships_iter():
-            uml_parent = uml_relationship.parent
-            uml_child  = uml_relationship.child
-            if isinstance(uml_child, UMLClass):
-                uml_relationship.parent = cls.resolve_simple_type(uml_pool, uml_parent, 
-                                                                  uml_child.scope, name_openings)
+            # Loop over relationships
+            # uml_source  = uml_relationship.source
+            # print len(uml_class.relationships)
+            for uml_relationship in uml_class.relationships_iter():
+                uml_destination = uml_relationship.destination
+                uml_relationship.destination = cls.resolve_simple_type(uml_pool, uml_relationship.destination, 
+                                                                       uml_class, # Similarly: uml_relationship.source.scope, 
+                                                                       name_openings)
+                # if isinstance(uml_relationship.destination, UMLDataTypeStub):
+                #     print type(uml_relationship.destination), type(uml_destination), type(uml_relationship.source)
+                #     print uml_relationship.destination.id, uml_relationship.source.id
 
     @classmethod
     def resolve_simple_type(cls, uml_pool, uml_type_base, 
@@ -746,16 +770,11 @@ class CppTextParser(object):
 
             # @TODO Implement correct scope resolution order
             for new_path in path_to_try:
-                attribClassId = new_path.id
-                if uml_pool.Class.has_key(attribClassId):
-                    return uml_pool.Class[attribClassId]
-                else:
-                    scope = embracing_scope
-                    while isinstance(scope, UMLNamespace):
-                        attribClassId = new_path.rel_id(scope)
-                        if uml_pool.Class.has_key(attribClassId):
-                            return uml_pool.Class[attribClassId]
-                        else: scope = scope.scope
+                scope = embracing_scope
+                while scope:
+                    uml_classifier = scope.get(uml_type_base)
+                    if uml_classifier: return uml_classifier
+                    else: scope = scope.scope
         return uml_type_base
 
     @classmethod

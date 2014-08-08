@@ -156,7 +156,7 @@ class UMLClassRelationsGraph(MultiDiGraph):
             else: return
         if not self.has_node(dest) :
             if forced: self.add_node(dest)
-            else: return
+            else: return 
 
         self.add_edge(source, dest, data = uml_relationship)
 

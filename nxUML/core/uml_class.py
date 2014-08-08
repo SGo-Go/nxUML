@@ -15,8 +15,8 @@ stored as networkx graph object.
 """
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
-
-from nxUML.core.uml_classifier import UMLClassifier
+from nxUML.core.uml_class_primitives    import IUMLElement
+from nxUML.core.uml_classifier          import UMLClassifier
 
 ######################################################################
 class UMLClass(UMLClassifier):
@@ -40,9 +40,6 @@ class UMLClass(UMLClassifier):
 
         # Fill dependencies 
         self.parent       = parent
-
-        self.realizations = []
-        self.usages       = []
 
         super(UMLClass, self).__init__(name = str(name), scope = scope, subclasses = subclasses)
 
@@ -161,7 +158,7 @@ class UMLClass(UMLClassifier):
         return xmlClass
 
 ######################################################################
-class UMLClassAttribute:
+class UMLClassAttribute(IUMLElement):
     def __init__(self, name, type, 
                  visibility, 
                  constant = False,
@@ -209,6 +206,7 @@ class UMLClassMethod:
                  visibility,
                  abstract   = False,
                  utility    = False,
+                 errors     = None, 
                  properties = []):
         self.name       = str(name)
         self.rtnType    = rtnType
@@ -282,21 +280,30 @@ class UMLClassMethod:
         #     xmlRetType      = self.rtnType.toXML(xmlMethod)
         return xmlMethod
 
+
 ######################################################################
-class UMLInterface(object):
-    def __init__(self, name, 
-                 scope    = None,
-                 stereotypes = [],):
-        # Extract data
-        self.name     = str(name)
-        self.scope    = scope
-        self.stereotypes = stereotypes
+class UMLInterface(UMLClassifier): #pass
+    def toXML(self, root = None, reference = False):
+        if reference:
+            from nxUML.core.uml_datatype import UMLDataTypeStub
 
-    @property
-    def id(self):
-        return self.name
+            xmlClass = UMLDataTypeStub(self.name, self.scope).toXML(root)
+            xmlClass.set("hrefId", self.id)
+            return xmlClass
 
-    def __str__(self):
-        return r'{stereotypes}{self.scope}.{self.name}'.\
-            format(self=self,
-                   stereotypes = "<<%s>>"%",".join(self.stereotypes),)
+    # def __init__(self, name, 
+    #              scope    = None,
+    #              stereotypes = [],):
+    #     # Extract data
+    #     self.name     = str(name)
+    #     self.scope    = scope
+    #     self.stereotypes = stereotypes
+
+    # @property
+    # def id(self):
+    #     return self.name
+
+    # def __str__(self):
+    #     return r'{stereotypes}{self.scope}.{self.name}'.\
+    #         format(self=self,
+    #                stereotypes = "<<%s>>"%",".join(self.stereotypes),)

@@ -18,7 +18,7 @@ __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 from nxUML.core.uml_class_primitives    import IUMLElement, \
     UMLNamedElement, UMLTemplateableElement #, UMLNamespace
 from nxUML.core.uml_multiplicity        import UMLMultiplicityStack
-
+from nxUML.core.uml_classifier          import UMLClassifier
 ######################################################################
 class IUMLDataType(UMLNamedElement): 
     def toXML(self, root = None, reference = False):
@@ -37,7 +37,7 @@ class UMLPrimitiveDataType(IUMLDataType):
     def __repr__(self): return self.name
 
     def toXML(self, root = None, reference = False):
-        xmlType = super(UMLPrimitiveDataType, self).toXML(root, reference)
+        xmlType = super(UMLPrimitiveDataType, self).toXML(root = root, reference = reference)
         xmlType.set("type", "primitive")
         return xmlType
 
@@ -54,8 +54,14 @@ class UMLDataTypeStub(UMLTemplateableElement, IUMLDataType):
                  scope = None, 
                  parameters = [],):
         super(UMLDataTypeStub, self).__init__(name = name, 
-                                                scope = scope, 
-                                                parameters = parameters)
+                                              scope = scope, 
+                                              parameters = parameters)
+
+    def __eq__(self, uml_classifier):
+        if isinstance(uml_classifier, UMLClassifier):
+            return self.name == uml_classifier.name and self.scope == uml_classifier.scope
+        else:
+            super(self, UMLDataTypeStub).__eq__(uml_classifier)
 
     def __repr__(self):
         parameters = ','.join(map(str,self.parameters))
@@ -111,10 +117,11 @@ class UMLDataTypeDecorator(IUMLElement):
         from nxUML.core.uml_class import UMLClass
 
         if isinstance(self.base, UMLClass):
-            xmlType = UMLDataTypeStub(self.base.name, self.base.scope).toXML(root)
+            xmlType = UMLDataTypeStub(self.base.name, self.base.scope).toXML(root = root)
             xmlType.set("hrefId", self.base.id)
             xmlType.set("type", "class")
-        else: xmlType = self.base.toXML(root)
+        else: 
+            xmlType = self.base.toXML(root = root, reference = True)
 
         if not self.composite:
             xmlMulti = self.multiplicity.toXML(xmlType)

@@ -16,6 +16,7 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 ######################################################################
+
 class UMLElementRelativeName(list):
     """Relative scope. 
     Used if the real scope is not known.
@@ -148,6 +149,8 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
     def add(self, uml_packageable_element):
         if isinstance(uml_packageable_element, UMLNamedElement):
             self.named_elements[uml_packageable_element.name] = uml_packageable_element
+        elif uml_packageable_element is not None:
+            raise TypeError('Non-packagebla element {0} is added as packageable'.format(type(uml_packageable_element)))
 
     def __getitem__(self, name):
         return self.named_elements[name]
@@ -170,6 +173,13 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
             if isinstance(uml_package, UMLPackage):
                 yield (uml_package)
 
+    def __iter__(self):
+        """Iterate over the namespaces.
+        """
+        for uml_namespace in self.named_elements.values():
+            if isinstance(uml_namespace, UMLNamespace):
+                yield (uml_namespace)
+
     @property
     def id(self):
         scopeId = self.scope.id
@@ -178,6 +188,21 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
     def rel_id(self, scope):
         scope_id = scope.id
         return '.'.join([scope_id, self.id]) if len(scope_id) > 0 else self.id
+
+
+    def get(self, uml_path):
+        from nxUML.core.uml_datatype    import UMLDataTypeStub
+
+        if isinstance(uml_path, UMLDataTypeStub):
+            uml_type_path = list(uml_path.scope) + [uml_path.name]
+            uml_anchor = self
+            for name in uml_type_path:
+                if uml_anchor.named_elements.has_key(name):
+                    uml_anchor = uml_anchor.named_elements[name]
+                else: return None
+            return uml_anchor
+        else:
+            raise
 
     @property
     def full_name(self):

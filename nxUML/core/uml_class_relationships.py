@@ -56,21 +56,6 @@ class UMLNaryRelationship(UMLRelationship):
 
 
 ######################################################################
-class UMLRealization(UMLBinaryRelationship):
-    def __init__(self, cls, iface):
-        super(UMLRealization, self).__init__(iface, cls)
-
-    def __str__(self):
-        return "{self.source.name}-(){self.destination.name}".format(self=self)
-
-class UMLUsage(UMLBinaryRelationship):
-    def __init__(self, iface, cls):
-        super(UMLUsage, self).__init__(cls, iface)
-
-    def __str__(self):
-        return "{self.source.name})-{self.destination.name}".format(self=self)
-
-######################################################################
 
 class UMLBinaryAssociation(UMLBinaryRelationship):
     def __init__(self, classifier1, classifier2, order_reading = None):
@@ -171,25 +156,25 @@ class UMLAggregation(UMLBinaryRelationship):
 ######################################################################
 
 class UMLGeneralization(UMLBinaryRelationship):
-    def __init__(self, parent, child, visibility = '  '):
+    def __init__(self, child, parent, visibility = '  '):
         self.visibility = visibility
-        super(UMLGeneralization, self).__init__(parent, child)
+        super(UMLGeneralization, self).__init__(child, parent)
 
     @property
     def child(self):
-        return self.destination
+        return self.source
 
     @child.setter
     def child(self, child_class):
-        self.destination = child_class
+        self.source = child_class
 
     @property
     def parent(self):
-        return self.source
+        return self.destination
 
     @parent.setter
     def parent(self, parent_class):
-        self.source = parent_class
+        self.destination = parent_class
 
     def __str__(self):
         return "{self.parent.name}<-[{self.visibility}]-{self.child.name}".format(self=self)

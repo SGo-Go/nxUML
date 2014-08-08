@@ -20,7 +20,7 @@ from nxUML.core.uml_class_primitives    import UMLRootNamespace
 from nxUML.core.uml_class               import UMLClass, UMLInterface
 from nxUML.core.uml_class_relationships import *
 from nxUML.core.uml_artifacts           import *
-from nxUML.core.uml_class_diag          import UMLClassRelationsGraph
+from nxUML.core.uml_class_graph         import UMLClassRelationsGraph
 
 class UMLDeploymentPool(object):
     def __init__(self, name='', 
@@ -87,7 +87,7 @@ class UMLPool(object):
         """Check if the given name is a name of class from pool
         Use the expression 'cls in uml_pool'.
         
-        @param cls name of class to check
+        @param  cls name of class to check
         @return True if cls is a class from pool, False otherwise.
         """
         return self.Class.has_key(cls)
@@ -100,35 +100,44 @@ class UMLPool(object):
         """
         return len(self.Class)
 
-    def __iter__(self):
-        """Iterate over the classes.
-        """
-        return iter(self.Class)
+    # def get(self, uml_relname, max_scope):
+    #     scope = max_scope
+    #     while isinstance(scope, UMLPackage) or isinstance(scope, UMLClass):
+    #         item = scope.get(uml_relname)
+    #         if item:    return item
+    #         else:       scope = scope.scope
+    #     return None
 
-    def classes_iter(self, scope = ''):
+
+    def dfs_iter(self):
+        """Iterate over the elements from the given namespace.
+        """
+        from nxUML.core.uml_class_primitives import UMLNamespace
+
+        namespacesStack = [self.root]
+        while len(namespacesStack) > 0:
+            namespace = namespacesStack.pop()
+            for elem in namespace:
+                namespacesStack.append(elem)
+            yield(namespace)
+
+    # def __iter__(self):
+    #     """Iterate over the classes.
+    #     """
+    #     return iter(self.Class)
+
+    def classes_iter(self):
         """Iterate over the classes from the given package.
         """
-        for cls_name, uml_class in self.Classes.items():
-            if len(scope) == 0:
+        for uml_class in self.dfs_iter():
+            if isinstance(uml_class, UMLClass):
                 yield (uml_class)
-            elif uml_class.scope == scope:
-                yield (uml_class)
-
-    def relationships_iter(self):
-        return iter(self._relationships)
 
     def generalizations_iter(self, parents = None, childs = None):
-        for relationship in self.relationships_iter():
-            if isinstance(relationship, UMLGeneralization): 
+        for uml_class in self.classes_iter():
+            for relationship in uml_class.relationships_iter(type=UMLGeneralization):
                 yield (relationship)
 
-    def get(self, uml_relname, max_scope):
-        scope = max_scope
-        while isinstance(scope, UMLPackage) or isinstance(scope, UMLClass):
-            item = scope.get(uml_relname)
-            if item:    return item
-            else:       scope = scope.scope
-        return None
 
 class UMLPoolDocumenter(object):
     """Pool of classes with relationships between them
@@ -143,6 +152,7 @@ class UMLPoolDocumenter(object):
                                                    auto_aggregation = False,
                                                    forced_relationships = True
                                                    )
+        self.inheritances.import_generalizations(self.pool)
 
         self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
                                                    with_generalizations = False,
