@@ -44,3 +44,19 @@ class UMLClassifier(UMLNamespace, UMLRedefinableElement):
     @property
     def generalizations(self):
         return self.relationships_iter(type=UMLGeneralization)
+
+    def generalizations_iter(self):
+        return self.relationships_iter(type=UMLGeneralization)
+
+    def parents_dfs(self):
+        """Iterate over parent classes (starting from the class itself) 
+        in a depth-first order
+        """
+        parentsStack = [self]
+        while len(parentsStack) > 0:
+            parent = parentsStack.pop()
+            if isinstance(parent, UMLClassifier):
+                for generalization in parent.generalizations_iter():
+                    if generalization.parent.id != generalization.child.id: 
+                        parentsStack.append(generalization.parent)
+            yield(parent)

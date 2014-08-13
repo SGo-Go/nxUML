@@ -27,7 +27,7 @@
 		<li><a href="#">Main</a></li>
 		<li><a href="#">Header</a></li>
 		<li class="active"><a href="#">Class</a></li>
-		<li><a href="#Brownie_provide">Brownie</a></li>
+		<!-- <li><a href="#Brownie_provide">Brownie</a></li> -->
 	      </ul>
 	    </nav>
 	  </header>
@@ -49,7 +49,7 @@
 		  <li><a href="#relationships">Relationships</a></li>
 		  <li><a href="#attributes">Attributes</a></li>
 		  <li><a href="#methods">Methods</a></li>
-		  <li><a href="#Brownie">Brownie</a></li>
+		  <!-- <li><a href="#Brownie">Brownie</a></li> -->
 		</ul>
 	      </nav>
 	    </article>
@@ -188,49 +188,47 @@
     </xsl:choose>
   </xsl:template>
 
-  <xsl:template match="class/interfaces">
-    <h2><span id="Brownie">Brownie interfaces</span></h2>
-    <xsl:apply-templates select="in"/>
-    <xsl:apply-templates select="out"/>
-  </xsl:template>
+  <xsl:template name="brownie-relationships">
+    <!-- <h2><span id="Brownie">Brownie interfaces</span></h2> -->
 
-  <xsl:template match="class/interfaces/in">
-    <div class="col_66">
-      <h3>Require (Concretes) </h3>
-      <table class="table">
-	<tr>
-	  <th>Name</th>
-	  <th>Class</th>
-	</tr>
-	<tr><th colspan = "2">Notifications</th></tr>
-	<xsl:apply-templates select="interface[@type='notification']"/>
-	<tr><th colspan = "2">Calls</th></tr>
-	<xsl:apply-templates select="interface[@type='call']"/>
-      </table>      
+    <div class="col_100">
+      <h4>Require (concretes):</h4>
+      <!-- <table class="table"> -->
+	<!-- <tr> -->
+	<!--   <th>Name</th> -->
+	<!--   <th>Class</th> -->
+	<!-- </tr> -->
+	<!-- <tr><th colspan = "2">Notifications</th></tr> -->
+	<ul>
+	  <xsl:apply-templates select="relationship[@type='brownie::usage']"/>
+	</ul>
+      <!-- 	<tr><th colspan = "2">Calls</th></tr> -->
+      <!-- 	<xsl:apply-templates select="relationship[@type='brownie::usage']"/> -->
+      <!-- </table> -->
     </div>
-  </xsl:template>
 
-  <xsl:template match="class/interfaces/out">
-    <div class="col_66">
-      <h3><span id="Brownie_provide">Provide (Formals)</span> </h3>
-      <table class="table">
-	<tr>
-	  <th>Name</th>
-	  <th>Class</th>
-	</tr>
-	<tr>
-	  <th colspan = "2">
-	    Notifications
-	  </th>
-	</tr>
-	<xsl:apply-templates select="interface[@type='notification']"/>
-	<tr>
-	  <th colspan = "2">
-	    Calls
-	  </th>
-	</tr>
-	<xsl:apply-templates select="interface[@type='call']"/>
-      </table>
+    <div class="col_100">
+      <h4><span id="Brownie_provide">Provide (formals):</span> </h4>
+      <!-- <table class="table"> -->
+      <!-- 	<tr> -->
+      <!-- 	  <th>Name</th> -->
+      <!-- 	  <th>Class</th> -->
+      <!-- 	</tr> -->
+      <!-- 	<tr> -->
+      <!-- 	  <th colspan = "2"> -->
+      <!-- 	    Notifications -->
+      <!-- 	  </th> -->
+      <!-- 	</tr> -->
+      <ul>
+	<xsl:apply-templates select="relationship[@type='brownie::realization']"/>
+      </ul>
+      <!-- 	<tr> -->
+      <!-- 	  <th colspan = "2"> -->
+      <!-- 	    Calls -->
+      <!-- 	  </th> -->
+      <!-- 	</tr> -->
+      <!-- 	<xsl:apply-templates select="relationship[@type='brownie::realization']"/> -->
+      <!--   </table> -->
     </div>
   </xsl:template>
 
@@ -252,11 +250,13 @@
   <xsl:template match="class/relationships">
     <h2><span id="relationships">Relationships</span></h2>
 
+    <h3>Brownie</h3>
     <xsl:apply-templates select="brownie"/>
+    <xsl:call-template name="brownie-relationships"/>
 
-    <xsl:apply-templates select="inheritances"/>
+    <xsl:call-template name="inheritance-relationships"/>
 
-    <xsl:apply-templates select="aggregations"/>
+    <!-- <xsl:apply-templates select="aggregations"/> -->
 
   </xsl:template>
 
@@ -265,16 +265,22 @@
   <!-- ************************************************** -->
   <xsl:template match="class/relationships/brownie">
     <div class="col_100">
-      <h3>Brownie</h3>
       <table class="table">
 	<tr>
-	  <th>Relationship</th>
-	  <th>Class</th>
+	  <xsl:for-each select="relationship">
+	    <th class="message"><xsl:value-of select="@type"/></th>
+	  </xsl:for-each>
 	</tr>
-	<xsl:apply-templates select="relationship"/>
+	<tr>
+	  <xsl:for-each select="relationship">
+	    <td class="message"><code><xsl:apply-templates select="datatype[2]"/></code></td>
+	  </xsl:for-each>
+	</tr>
       </table>      
     </div>
     <div class="clearfix"></div>
+    <!-- <td class="button"><xsl:value-of select="@type"/></td> -->
+    <!-- <td><p class="message"><xsl:value-of select="@type"/></p></td> -->
   </xsl:template>
 
   <xsl:template match="class/relationships/brownie/relationship">
@@ -330,49 +336,91 @@
   <!-- ************************************************** -->
   <!-- Inheritance relationships templates -->
   <!-- ************************************************** -->
-  <xsl:template match="class/relationships/inheritances">
+  <xsl:template name="inheritance-relationships">
     <div class="col_100">
-      <h3>Inheritances</h3>
-      <table class="table">
-	<tr>
-	  <th>Class</th>
-	  <th>Scope</th>
-	</tr>
-	<tr>
-	  <th colspan = "2">
-	    Base classes
-	  </th>
-	</tr>
-	<xsl:apply-templates select="relationship[@direction='base']"/>
-	<tr>
-	  <th colspan = "2">
-	    Derived classes
-	  </th>
-	</tr>
-	<xsl:apply-templates select="relationship[@direction='derived']"/>
-      </table>
+      <h3>Inheritance</h3>
+      <!-- <table class="table"> -->
+      <!-- 	<tr> -->
+      <!-- 	  <th>Class</th> -->
+      <!-- 	  <th>Scope</th> -->
+      <!-- 	</tr> -->
+      <!-- <tr> -->
+      <!--   <th colspan = "2"> -->
+      <!--     Base classes -->
+      <!--   </th> -->
+      <!-- </tr> -->
+      <h4>Extends:</h4> 
+      <ul>
+	<xsl:apply-templates select="relationship[@type='generalization' and @direction='out']"/>
+      </ul>
+
+      <h4>Derived:</h4> 
+      <ul>
+	<xsl:apply-templates select="relationship[@type='generalization' and @direction='in']"/>
+      </ul>
+      <!-- <tr> -->
+      <!--   <th colspan = "2"> -->
+      <!--     Derived classes -->
+      <!--   </th> -->
+      <!-- </tr> -->
+      <!-- <xsl:apply-templates select="relationship[@direction='derived']"/> -->
+      <!-- </table> -->
     </div>
   </xsl:template>
 
-  <xsl:template match="class/relationships/inheritances/relationship[@direction='base']">
-    <tr>
-      <td>
-	<xsl:call-template name="show-visibility"/>
-	<code><xsl:apply-templates select="./datatype[1]"/></code>
-      </td>
-      <td><code><xsl:value-of select="./datatype[1]/@scope"/></code></td>
-    </tr>
+  <xsl:template match="class/relationships/relationship[@direction='in']">
+    <!-- <tr> -->
+    <!--   <td> -->
+    <li>
+      <xsl:call-template name="show-visibility"/>
+      <code><xsl:apply-templates select="./datatype[1]"/></code>
+    </li>
+    <!--   </td> -->
+    <!--   <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
+    <!-- </tr> -->
   </xsl:template>
 
-  <xsl:template match="class/relationships/inheritances/relationship[@direction='derived']">
-    <tr>
-      <td>
-	<xsl:call-template name="show-visibility"/>
-	<code><xsl:apply-templates select="./datatype[2]"/></code>
-      </td>
-      <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td>
-    </tr>
+  <xsl:template match="class/relationships/relationship[@direction='out']">
+    <!-- <tr> -->
+    <!--   <td> -->
+    <li>
+      <xsl:call-template name="show-visibility"/>
+      <code><xsl:apply-templates select="./datatype[2]"/></code>
+    </li>
+    <!--   </td> -->
+    <!--   <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
+    <!-- </tr> -->
   </xsl:template>
+
+  <!-- <xsl:template match="class/relationships/relationship[@type='brownie::realization']"> -->
+  <!--   <tr> -->
+  <!--     <td> -->
+  <!-- 	<xsl:call-template name="show-visibility"/> -->
+  <!-- 	<code><xsl:apply-templates select="./datatype[2]"/></code> -->
+  <!--     </td> -->
+  <!--     <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
+  <!--   </tr> -->
+  <!-- </xsl:template> -->
+
+  <!-- <xsl:template match="class/relationships/relationship[@direction='base']"> -->
+  <!--   <tr> -->
+  <!--     <td> -->
+  <!-- 	<xsl:call-template name="show-visibility"/> -->
+  <!-- 	<code><xsl:apply-templates select="./datatype[2]"/></code> -->
+  <!--     </td> -->
+  <!--     <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
+  <!--   </tr> -->
+  <!-- </xsl:template> -->
+
+  <!-- <xsl:template match="class/relationships/inheritances/relationship[@direction='derived']"> -->
+  <!--   <tr> -->
+  <!--     <td> -->
+  <!-- 	<xsl:call-template name="show-visibility"/> -->
+  <!-- 	<code><xsl:apply-templates select="./datatype[1]"/></code> -->
+  <!--     </td> -->
+  <!--     <td><code><xsl:value-of select="./datatype[1]/@scope"/></code></td> -->
+  <!--   </tr> -->
+  <!-- </xsl:template> -->
 
   <!-- ************************************************** -->
   <!-- Common templates -->

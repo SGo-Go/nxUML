@@ -13,9 +13,9 @@
  HTML pages
 ######################################################################
 """
-from brownie_parser import UMLBrownieCall,UMLBrownieNotification
 from nxUML.core import UMLPool, UMLPoolDocumenter, UMLClassRelationsGraph #UMLClassDiagram, 
-from nxUML.core import UMLPackage, UMLClass
+from nxUML.core import UMLPackage, UMLClassifier #UMLClass, 
+from brownie_uml import * #UMLBrownieUsage, UMLBrownieRealization, UMLBrownieInterface, UMLBrownieCall,UMLBrownieNotification
 
 class BrowniePoolDocumenter(UMLPoolDocumenter):
     def source2XML(self, headerId):
@@ -48,15 +48,6 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
             xmlClass.set('scope', uml_class.scope)
         return xmlSource
 
-
-    def generalization2XML(self, root, tag, class_list):
-        for classId in class_list:
-            uml_class = self.pool.Class[classId]
-            xmlItem = etree.SubElement(root, tag)
-            xmlItem.set('name', uml_class.name)
-            xmlItem.set('scope', uml_class.scope)
-        return root
-
     def class2XML(self, uml_class):
         from lxml import etree
 
@@ -66,53 +57,55 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
         if isinstance(uml_class.scope, UMLPackage):
             xmlScope = uml_class.scope.toXML(xmlClass, scope = True)
 
-        # if len(self.location)>0:
-        #     xmlClass.set("location", self.location)
+        # for rel in self.inheritances.relationships_iter(uml_class):
+        #     print rel
 
-        if classId in self.inheritances:
-            # Walk through inheritance tree to find out whether class supports Brownie interface
-            stereo_dict = dict([(x,None) for x in ('ServiceCallable', 'LocalCallable', 'LocalCallback')])
-            for className in self.inheritances.predecessors(classId) + [classId]:
-                if className in self.pool:
-                    stereotypes = self.pool.Class[className].modifiers
-                    for stereotype in stereotypes:
-                        if stereotype in stereo_dict.keys():
-                            stereo_dict[stereotype] = self.pool.Class[className]
+        # Walk through inheritance tree to find out whether class supports Brownie interfaces
+        stereo_dict = dict([(x,None) for x in ('ServiceCallable', 'LocalCallable', 'LocalCallback')])
+        for parent in uml_class.parents_dfs():
+            if isinstance(parent, UMLClassifier):
+                for stereotype in parent.modifiers:
+                    if stereotype in stereo_dict.keys():
+                        stereo_dict[stereotype] = parent
 
-            xmlRelationships = etree.SubElement(xmlClass, 'relationships')
-            xmlBrownieRelationships = etree.SubElement(xmlRelationships, 'brownie')
-            for stereotype, classProvider in stereo_dict.items():
-                # uml_class_ = self.pool.Class[cls_whole]
-                xmlBrownieItem = etree.SubElement(xmlBrownieRelationships, 'relationship', type = stereotype)
-                xmlSource = uml_class.toXML(xmlBrownieItem, reference = True)
-                if stereo_dict[stereotype]:
-                    xmlDest   = stereo_dict[stereotype].toXML(xmlBrownieItem, reference = True)
+        xmlRelationships = etree.SubElement(xmlClass, 'relationships')
+        xmlBrownieRelationships = etree.SubElement(xmlRelationships, 'brownie')
+        for stereotype, classProvider in stereo_dict.items():
+            xmlBrownieItem = etree.SubElement(xmlBrownieRelationships, 'relationship', type = stereotype)
+            xmlSource = uml_class.toXML(xmlBrownieItem, reference = True)
+            if stereo_dict[stereotype]:
+                xmlDest   = stereo_dict[stereotype].toXML(xmlBrownieItem, reference = True)
 
-        
-            xmlInheritances = etree.SubElement(xmlRelationships, 'inheritances')
-            for baseId, ownId, data in self.inheritances.in_edges_iter(uml_class.id, data=True):
-            # uml_base_type = data['data'].parent #self.pool.Class[baseId]
-            # xmlLink = etree.SubElement(xmlInheritances, 'link', type = 'base')
-            # xmlLink.set('visibility', data['data'].visibility)
-            # xmlLink.set('owner', baseId)
-            # xmlLink.set('owner', uml_base_type.id)
-            # xmlLink.set('owner-name', uml_base_type.name)
-            # xmlLink.set('owner-scope', str(uml_base_type.scope))
-                xmlLink = data['data'].toXML(xmlInheritances)
-                xmlLink.set('direction', 'base')
+        # Iterate over all relationships
+        for uml_relationship in self.inheritances.relationships_iter(uml_class):
+            xmlLink = uml_relationship.toXML(xmlRelationships)
+            xmlLink.attrib['direction'] = 'in' if uml_relationship.destination.id == classId else 'out'
+            if isinstance(uml_relationship, UMLBrownieUsage):
+                xmlRemotes = etree.SubElement(xmlLink, 'remotes')
+                if isinstance(uml_relationship.interface, UMLBrownieInterface):
+                    for uml_realization in self.inheritances.in_relationships_iter(uml_relationship.interface):
+                        if isinstance(uml_realization, UMLBrownieRealization):
+                            uml_realization.classifier.toXML(xmlRemotes, reference=True)
+                    # print(etree.tostring(xmlLink, pretty_print=True))
+
+            elif isinstance(uml_relationship, UMLBrownieRealization):
+                xmlRemotes = etree.SubElement(xmlLink, 'remotes')
+                if isinstance(uml_relationship.interface, UMLBrownieInterface):
+                    for uml_realization in self.inheritances.in_relationships_iter(uml_relationship.interface):
+                        if isinstance(uml_realization, UMLBrownieUsage):
+                            uml_realization.classifier.toXML(xmlRemotes, reference=True)
+                    # print(etree.tostring(xmlLink, pretty_print=True))
+
+
+        xmlInheritances = etree.SubElement(xmlRelationships, 'inheritances')
+        for baseId, ownId, data in self.inheritances.out_edges_iter(uml_class.id, data=True):
+            xmlLink = data['data'].toXML(xmlInheritances)
+            xmlLink.set('direction', 'base')
             # print(etree.tostring(xmlLink, pretty_print=True))
 
-
-            for ownId, baseId, data in self.inheritances.out_edges_iter(uml_class.id, data=True):
-            # uml_base_type = data['data'].child #self.pool.Class[baseId]
-            # xmlLink = etree.SubElement(xmlInheritances, 'link', type = 'derived')
-            # xmlLink.set('visibility', data['data'].visibility)
-            # xmlLink.set('owner', baseId)
-            # xmlLink.set('owner', uml_base_type.id)
-            # xmlLink.set('owner-name', uml_base_type.name)
-            # xmlLink.set('owner-scope', str(uml_base_type.scope))
-                xmlLink = data['data'].toXML(xmlInheritances)
-                xmlLink.set('direction', 'derived')
+        for ownId, baseId, data in self.inheritances.in_edges_iter(uml_class.id, data=True):
+            xmlLink = data['data'].toXML(xmlInheritances)
+            xmlLink.set('direction', 'derived')
 
         #subclasses      = uml_class.subclasses
 
@@ -133,6 +126,9 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
                 
         # xmlBrownie = etree.SubElement(xmlClass, 'interfaces')
         # xmlBrownieIn  = etree.SubElement(xmlBrownie, 'in')
+
+        # xmlLink = data['data'].toXML(xmlInheritances)
+        # xmlLink.set('direction', 'base')
         # xmlBrownieOut = etree.SubElement(xmlBrownie, 'out')
 
         # for ifaceId in uml_class.usages:

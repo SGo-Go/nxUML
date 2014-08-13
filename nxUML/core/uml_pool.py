@@ -109,12 +109,13 @@ class UMLPool(object):
     #     return None
 
 
-    def dfs_iter(self):
+    def namespaces_dfs(self, root = None):
         """Iterate over the elements from the given namespace.
         """
         from nxUML.core.uml_class_primitives import UMLNamespace
+        if root is None: root = self.root
 
-        namespacesStack = [self.root]
+        namespacesStack = [root]
         while len(namespacesStack) > 0:
             namespace = namespacesStack.pop()
             for elem in namespace:
@@ -126,17 +127,22 @@ class UMLPool(object):
     #     """
     #     return iter(self.Class)
 
-    def classes_iter(self):
+    def classes_dfs(self, root = None):
         """Iterate over the classes from the given package.
         """
-        for uml_class in self.dfs_iter():
+        for uml_class in self.namespaces_dfs(root):
             if isinstance(uml_class, UMLClass):
                 yield (uml_class)
 
-    def generalizations_iter(self, parents = None, childs = None):
-        for uml_class in self.classes_iter():
+    def relationships_iter(self, root = None, type = None):
+        for uml_class in self.classes_dfs(root):
+            for relationship in uml_class.relationships_iter(type=type):
+                yield(relationship)
+
+    def generalizations_iter(self, root = None):
+        for uml_class in self.classes_dfs(root):
             for relationship in uml_class.relationships_iter(type=UMLGeneralization):
-                yield (relationship)
+                yield(relationship)
 
 
 class UMLPoolDocumenter(object):
@@ -152,7 +158,7 @@ class UMLPoolDocumenter(object):
                                                    auto_aggregation = False,
                                                    forced_relationships = True
                                                    )
-        self.inheritances.import_generalizations(self.pool)
+        self.inheritances.import_relationships(self.pool)
 
         self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
                                                    with_generalizations = False,

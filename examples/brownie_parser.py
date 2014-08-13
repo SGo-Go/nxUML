@@ -80,7 +80,7 @@ class BrownieTextParser(CppTextParser):
     #             return None
 
     @classmethod
-    def handle_generalization(cls, uml_pool, parent, child, **kwargs):
+    def handle_generalization(cls, uml_pool, child, parent, **kwargs):
         if parent.name in ('ServiceCallable', 'LocalCallable', 'LocalCallback') \
                 and len(parent.parameters) > 0 \
                 and parent.parameters[0].base.name == child.name:
@@ -88,7 +88,7 @@ class BrownieTextParser(CppTextParser):
             child.add_modifier(parent.name)
             return None
         else:
-            return super(BrownieTextParser,cls).handle_generalization(uml_pool, parent, child,**kwargs)
+            return super(BrownieTextParser,cls).handle_generalization(uml_pool, child, parent,**kwargs)
 
     @classmethod
     def handle_typedef(cls, uml_pool, uml_namespace, **data):
@@ -133,7 +133,8 @@ class BrownieTextParser(CppTextParser):
         uml_iface = UMLBrownieNotification(name, uml_namespace, 
                                            value_type    = value_type,
                                            argument_type = argument_type,
-                                           visibility    = data['visibility'])
+                                           visibility = cls.visibility_types[data['visibility']], #data['visibility'], #
+                                           )
         uml_namespace.add(uml_iface)
         return uml_iface
 
@@ -145,20 +146,23 @@ class BrownieTextParser(CppTextParser):
                                    argument_type = argument_type, 
                                    result_type   = result_type,
                                    error_type    = error_type,
-                                   visibility    = data['visibility'])
+                                   visibility    = cls.visibility_types[data['visibility']], #data['visibility'], #
+                                   )
         uml_namespace.add(uml_iface)
         return uml_iface
 
     @classmethod
     def handle_brownie_realization(cls, uml_pool, uml_classifier, uml_iface, **data):
         uml_relationship = UMLBrownieRealization(uml_classifier, uml_iface, 
-                                                 visibility = data['visibility'], type = data['type'])
+                                                 visibility = cls.visibility_types[data['visibility']], #data['visibility'], #
+                                                 type       = data['type'])
         uml_classifier.add_relationship(uml_relationship)
         return uml_relationship
 
     @classmethod
     def handle_brownie_usage(cls, uml_pool, uml_classifier, uml_iface, **data):
         uml_relationship = UMLBrownieUsage(uml_classifier, uml_iface, 
-                                           visibility = data['visibility'], type = data['type'])
+                                           visibility = cls.visibility_types[data['visibility']], #data['visibility'], #
+                                           type = data['type'])
         uml_classifier.add_relationship(uml_relationship)
         return uml_relationship

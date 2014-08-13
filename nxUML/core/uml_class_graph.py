@@ -17,14 +17,17 @@ stored as networkx graph object.
 
 from networkx import MultiDiGraph
 from nxUML.core import *
+from brownie_uml import *
+# UMLClassifier
 
 class UMLClassRelationsGraph(MultiDiGraph):
     """Classes diagram representation in the form of networkx.MultiDiGraph
     for further analysis and visualization as needed
     """
     def __init__(self, name ='', 
-                 uml_pool = None,
+                 uml_pool = None, 
                  classes  = None, 
+                 # element_types = 
                  forced_relationships = False,
                  data=None,
                  **attr):
@@ -34,7 +37,6 @@ class UMLClassRelationsGraph(MultiDiGraph):
         self._relationships = []
 
         super(UMLClassRelationsGraph, self).__init__(data=data,name=name,**attr)
-
 
         if uml_pool is None: 
             if classes is not None: 
@@ -47,20 +49,19 @@ class UMLClassRelationsGraph(MultiDiGraph):
 
             # self.add_clases(uml_pool, cls_list,
             #                 with_generalizations = with_generalizations,
-            #                 with_interfaces      = with_interfaces,
-            #                 group_interfaces     = group_interfaces,
+            #                 with_generalizations      = with_generalizations,
+            #                 group_generalizations     = group_generalizations,
             #                 with_associations    = with_associations,
             #                 auto_aggregation     = auto_aggregation,
             #                 forced_relationships = forced_relationships)
 
-    def add_clases(self, uml_pool, classes, 
-                   with_generalizations = False,
-                   with_interfaces      = False,
-                   group_interfaces     = False,
-                   with_associations    = False,
-                   auto_aggregation     = False,
-                   forced_relationships = False,
-                   ):
+    def import_clases(self, uml_pool, classes, 
+                      with_generalizations = False,
+                      group_generalizations= False,
+                      with_associations    = False,
+                      auto_aggregation     = False,
+                      forced_relationships = False,
+                      ):
 
         for uml_class in classes:
             uml_class = uml_pool.Class[uml_class]
@@ -70,10 +71,16 @@ class UMLClassRelationsGraph(MultiDiGraph):
             self.import_generalizations(uml_pool, forced_relationships)
         if with_associations and uml_pool:
             self.import_associations(uml_pool, forced_relationships)
-        if with_interfaces and uml_pool:
-            self.import_interfaces(uml_pool, forced_relationships)
+        if with_generalizations and uml_pool:
+            self.import_generalizations(uml_pool, forced_relationships)
         if auto_aggregation:
             self.import_aggregations()
+        return self
+
+    def import_relationships(self, uml_pool, relationship_types = None, forced = True):
+        for uml_relationship in uml_pool.relationships_iter(): #(relationship_types = relationship_types):
+            self.add_relationship(uml_relationship, forced)
+        return self
 
     def import_generalizations(self, uml_pool, forced = True):
         for uml_relationship in uml_pool.generalizations_iter():
@@ -88,44 +95,17 @@ class UMLClassRelationsGraph(MultiDiGraph):
         for uml_class in self._classes.values():
             for attrib in uml_class.attributes:
                 if attrib.type.base.id in classes:
-                    aggr = UMLAggregation(uml_class, 
-                                          self._classes[attrib.type.base.id], attrib)
+                    aggr = UMLAggregation(uml_class, self._classes[attrib.type.base.id], attrib)
                     attrib.unfolding_level = 4
                     self.add_relationship(aggr)
 
-    def import_interfaces(self, uml_pool, forced = True):
-        from sets import Set
-
-        ifaces_ids = Set()
-        classes_ids = self.nodes()
-        for classId in classes_ids:
-            if classId in uml_pool.Class:
-                uml_class = uml_pool.Class[classId]
-                for iname in uml_class.usages:
-                    self.add_edge(iname, uml_class.id)
-                    ifaces_ids.add(iname)
-                for iname in uml_class.realizations:
-                    self.add_edge(uml_class.id, iname)
-                    ifaces_ids.add(iname)
-        self.disjoin_interfaces(ifaces_ids, forced = forced)
-        
-    def disjoin_interfaces(self, ifaces_ids, forced = True):
-        for iname in ifaces_ids:
-            source_ids = self.predecessors(iname)
-            dest_ids   = self.successors(iname)
-            self.remove_node(iname)
-            if   len(source_ids) == 0 and len(dest_ids) > 0:
-                if forced:
-                    for dest_id in dest_ids:
-                        self.add_edge(None, dest_id, iface = iname)
-            elif len(source_ids) > 0 and len(dest_ids) == 0:
-                if forced:
-                    for source_id in source_ids:
-                        self.add_edge(source_id, None, iface = iname)
-            elif len(source_ids) > 0 and len(dest_ids) > 0:
-                for source_id in source_ids:
-                    for dest_id in dest_ids:
-                        self.add_edge(source_id, dest_id, iface = iname)
+    def import_usages(self, uml_pool, forced = True):
+        for uml_class in self.classes_iter(root):
+            for uml_relationship in uml_class.relationships_iter():
+                if   isinstance(uml_relationship, UMLInterfaceRealization):
+                    self.add_relationship(uml_relationship, forced)
+                elif isinstance(uml_relationship, UMLInterfaceUsage):
+                    self.add_relationship(uml_relationship, forced)
 
     def add_class(self, uml_class):
         self._classes[uml_class.id] = uml_class
@@ -141,3 +121,35 @@ class UMLClassRelationsGraph(MultiDiGraph):
             else: return 
 
         self.add_edge(source, dest, data = uml_relationship)
+
+    def relationships_iter(self, uml_class):
+        if isinstance(uml_class, str):
+            classId = uml_class
+        elif isinstance(uml_class, UMLClassifier):
+            classId = uml_class.id
+        else: return 
+        for classIdFrom, classIdTo, data in self.in_edges_iter(classId, data=True):
+            yield(data['data'])
+        for classIdFrom, classIdTo, data in self.out_edges_iter(classId, data=True):
+            yield(data['data'])
+
+    def in_relationships_iter(self, uml_class):
+        if isinstance(uml_class, str):
+            classId = uml_class
+        elif isinstance(uml_class, UMLClassifier):
+            classId = uml_class.id
+        else: return 
+        # if uml_class.name == 'SetProfileDataCall':
+        #     print self.in_degree(classId), self.out_degree(classId), classId
+        for classIdFrom, classIdTo, data in self.in_edges_iter(classId, data=True):
+            yield(data['data'])
+
+    def out_relationships_iter(self, uml_class):
+        if isinstance(uml_class, str):
+            classId = uml_class
+        elif isinstance(uml_class, UMLClassifier):
+            classId = uml_class.id
+        else: return 
+        for classIdFrom, classIdTo, data in self.out_edges_iter(classId, data=True):
+            yield(data['data'])
+

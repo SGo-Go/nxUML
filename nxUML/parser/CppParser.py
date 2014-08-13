@@ -729,7 +729,7 @@ class CppTextParser(object):
         #         pckgItem.scope = getElementById(uml_pool, pckgScopeId)
 
         # Loop over classes
-        for uml_class in uml_pool.dfs_iter():
+        for uml_class in uml_pool.namespaces_dfs():
             if not isinstance(uml_class, UMLClass): continue
             classScopeId = uml_class.scope.id
             

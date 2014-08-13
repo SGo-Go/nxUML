@@ -44,6 +44,11 @@ class UMLUsage(UMLDependency):
     def __repr__(self):
         return "{self.source.name}<-<<use>>-{self.destination.name}".format(self=self)
 
+    def toXML(self, root = None):
+        xmlLink = super(UMLUsage, self).toXML(root)
+        xmlLink.set('type', 'usage')
+        return xmlLink
+
 class UMLAbstraction(UMLDependency):
     """@brief Abstraction 
 
@@ -63,6 +68,11 @@ class UMLRealization(UMLAbstraction):
     def __repr__(self):
         return "{self.source.name}<-<<abstraction>>-{self.destination.name}".format(self=self)
 
+    def toXML(self, root = None):
+        xmlLink = super(UMLRealization, self).toXML(root)
+        xmlLink.set('type', 'realization')
+        return xmlLink
+
 
 ######################################################################
 class UMLInterfaceUsage(UMLUsage):
@@ -76,14 +86,15 @@ class UMLInterfaceUsage(UMLUsage):
 
     @property
     def classifier(self):
-        return self.destination
+        return self.source
 
     @property
     def interface(self):
-        return self.source
+        return self.destination
 
     def __repr__(self):
         return "{self.classifier.name}-({self.interface.name}".format(self=self)
+
 
 ######################################################################
 class UMLInterfaceRealization(UMLRealization):
