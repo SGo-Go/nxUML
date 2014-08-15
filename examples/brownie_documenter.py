@@ -4,10 +4,12 @@
 """
 ######################################################################
  Project       nxUML
- (c) copyright 2014
+ (c) copyright 2014 All Right Reserved
 ######################################################################
- @file         brownie_documenter.py
- @author       Sergiy Gogolenko
+ @file          brownie_documenter.py
+ @author        Sergiy Gogolenko
+ @email         sergiy.gogolenko@gmail.com
+ @license       GPL
  
  Create XML schemes for UML pool objects for further XSL transform to 
  HTML pages

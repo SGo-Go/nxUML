@@ -33,10 +33,11 @@ TODO list:
     various stages of source code processing by parsers and carry out custom functions,
     dispatcher system for parsers
   * a diverse and deep serialization system which 
-    can produce and read XML and/or JSON representations of UML elements instances
+    can produce and read XML and/or JSON representations of UML element instances
   * a template system for document outputs
   * an interface to Django framework and Jinja2
 
-Copyright (C) 2014 nxUML 
+Copyright (C) 2014 nxUML, All Right Reserved
+License: GPL
 
 Sergiy Gogolenko <sergiy.gogolenko@gmail.com>

@@ -9,11 +9,12 @@
   <xsl:template match="/class">
     <html lang="en">
       <head>
+	<link rel="shortcut icon" type="image/x-icon" href="css/icons/favicon.ico" />
 	<meta charset="utf-8"/>
 	<meta name="viewport" content="width=device-width,initial-scale=1"/>
-	<!-- <link href="favicon.ico" rel="shortcut icon"/> -->
+
 	<link rel="stylesheet" href="css/style.css"/>
-	<title>MapCtrl documentation [<xsl:value-of select="text()"/>]</title>
+	<title>MapCtrl documentation [Class <xsl:value-of select="text()"/>]</title>
 	<!--[if lt IE 9]><script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
 	<!-- Skins are provided by Renat Rafikov (2012). 
 	     See http://simpliste.ru/en/ for more details. -->
@@ -58,11 +59,11 @@
 
 	      <xsl:apply-templates select="relationships"/>
 
+	      <xsl:apply-templates select="nested"/>
+
 	      <xsl:apply-templates select="attributes"/>
 
 	      <xsl:apply-templates select="methods"/>
-
-	      <xsl:apply-templates select="interfaces"/>
 
 	    </article>
 	  </div>
@@ -74,10 +75,6 @@
       </body>
     </html>
   </xsl:template>
-
-  <!-- <xsl:template match="class/attributes/attribute/datatype"> -->
-  <!--   <code><xsl:value-of select="text()"/></code><xsl:value-of select="@multiplicity"/> -->
-  <!-- </xsl:template> -->
 
   <xsl:template match="class/*/*/datatype">
     <xsl:if test="text() != '' ">
@@ -189,46 +186,18 @@
   </xsl:template>
 
   <xsl:template name="brownie-relationships">
-    <!-- <h2><span id="Brownie">Brownie interfaces</span></h2> -->
-
     <div class="col_100">
       <h4>Require (concretes):</h4>
-      <!-- <table class="table"> -->
-	<!-- <tr> -->
-	<!--   <th>Name</th> -->
-	<!--   <th>Class</th> -->
-	<!-- </tr> -->
-	<!-- <tr><th colspan = "2">Notifications</th></tr> -->
 	<ul>
 	  <xsl:apply-templates select="relationship[@type='brownie::usage']"/>
 	</ul>
-      <!-- 	<tr><th colspan = "2">Calls</th></tr> -->
-      <!-- 	<xsl:apply-templates select="relationship[@type='brownie::usage']"/> -->
-      <!-- </table> -->
     </div>
 
     <div class="col_100">
       <h4><span id="Brownie_provide">Provide (formals):</span> </h4>
-      <!-- <table class="table"> -->
-      <!-- 	<tr> -->
-      <!-- 	  <th>Name</th> -->
-      <!-- 	  <th>Class</th> -->
-      <!-- 	</tr> -->
-      <!-- 	<tr> -->
-      <!-- 	  <th colspan = "2"> -->
-      <!-- 	    Notifications -->
-      <!-- 	  </th> -->
-      <!-- 	</tr> -->
       <ul>
 	<xsl:apply-templates select="relationship[@type='brownie::realization']"/>
       </ul>
-      <!-- 	<tr> -->
-      <!-- 	  <th colspan = "2"> -->
-      <!-- 	    Calls -->
-      <!-- 	  </th> -->
-      <!-- 	</tr> -->
-      <!-- 	<xsl:apply-templates select="relationship[@type='brownie::realization']"/> -->
-      <!--   </table> -->
     </div>
   </xsl:template>
 
@@ -279,8 +248,6 @@
       </table>      
     </div>
     <div class="clearfix"></div>
-    <!-- <td class="button"><xsl:value-of select="@type"/></td> -->
-    <!-- <td><p class="message"><xsl:value-of select="@type"/></p></td> -->
   </xsl:template>
 
   <xsl:template match="class/relationships/brownie/relationship">
@@ -306,7 +273,6 @@
 	  <th>Role (attribute name)</th>
 	</tr>
 	<xsl:apply-templates select="relationship[@direction='part']"/>
-	<!-- <xsl:apply-templates select="attribute"/> -->
       </table>      
     </div>
   </xsl:template>
@@ -339,16 +305,6 @@
   <xsl:template name="inheritance-relationships">
     <div class="col_100">
       <h3>Inheritance</h3>
-      <!-- <table class="table"> -->
-      <!-- 	<tr> -->
-      <!-- 	  <th>Class</th> -->
-      <!-- 	  <th>Scope</th> -->
-      <!-- 	</tr> -->
-      <!-- <tr> -->
-      <!--   <th colspan = "2"> -->
-      <!--     Base classes -->
-      <!--   </th> -->
-      <!-- </tr> -->
       <h4>Extends:</h4> 
       <ul>
 	<xsl:apply-templates select="relationship[@type='generalization' and @direction='out']"/>
@@ -358,69 +314,22 @@
       <ul>
 	<xsl:apply-templates select="relationship[@type='generalization' and @direction='in']"/>
       </ul>
-      <!-- <tr> -->
-      <!--   <th colspan = "2"> -->
-      <!--     Derived classes -->
-      <!--   </th> -->
-      <!-- </tr> -->
-      <!-- <xsl:apply-templates select="relationship[@direction='derived']"/> -->
-      <!-- </table> -->
     </div>
   </xsl:template>
 
   <xsl:template match="class/relationships/relationship[@direction='in']">
-    <!-- <tr> -->
-    <!--   <td> -->
     <li>
       <xsl:call-template name="show-visibility"/>
       <code><xsl:apply-templates select="./datatype[1]"/></code>
     </li>
-    <!--   </td> -->
-    <!--   <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
-    <!-- </tr> -->
   </xsl:template>
 
   <xsl:template match="class/relationships/relationship[@direction='out']">
-    <!-- <tr> -->
-    <!--   <td> -->
     <li>
       <xsl:call-template name="show-visibility"/>
       <code><xsl:apply-templates select="./datatype[2]"/></code>
     </li>
-    <!--   </td> -->
-    <!--   <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
-    <!-- </tr> -->
   </xsl:template>
-
-  <!-- <xsl:template match="class/relationships/relationship[@type='brownie::realization']"> -->
-  <!--   <tr> -->
-  <!--     <td> -->
-  <!-- 	<xsl:call-template name="show-visibility"/> -->
-  <!-- 	<code><xsl:apply-templates select="./datatype[2]"/></code> -->
-  <!--     </td> -->
-  <!--     <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
-  <!--   </tr> -->
-  <!-- </xsl:template> -->
-
-  <!-- <xsl:template match="class/relationships/relationship[@direction='base']"> -->
-  <!--   <tr> -->
-  <!--     <td> -->
-  <!-- 	<xsl:call-template name="show-visibility"/> -->
-  <!-- 	<code><xsl:apply-templates select="./datatype[2]"/></code> -->
-  <!--     </td> -->
-  <!--     <td><code><xsl:value-of select="./datatype[2]/@scope"/></code></td> -->
-  <!--   </tr> -->
-  <!-- </xsl:template> -->
-
-  <!-- <xsl:template match="class/relationships/inheritances/relationship[@direction='derived']"> -->
-  <!--   <tr> -->
-  <!--     <td> -->
-  <!-- 	<xsl:call-template name="show-visibility"/> -->
-  <!-- 	<code><xsl:apply-templates select="./datatype[1]"/></code> -->
-  <!--     </td> -->
-  <!--     <td><code><xsl:value-of select="./datatype[1]/@scope"/></code></td> -->
-  <!--   </tr> -->
-  <!-- </xsl:template> -->
 
   <!-- ************************************************** -->
   <!-- Common templates -->
@@ -450,8 +359,6 @@
   </xsl:template>
 
 
-  <!-- <xsl:call-template name="put-reference"/> -->
-
   <!-- ************************************************** -->
   <!-- Common icons -->
   <!-- ************************************************** -->
@@ -468,23 +375,22 @@
 	</xsl:when>
 	<xsl:otherwise>
 	  <xsl:if test="@scope != '' ">
-	    <!-- [<xsl:value-of select="@scope"/>] -->
 	  </xsl:if>
 	  <xsl:value-of select="text()"/>
 	</xsl:otherwise>
       </xsl:choose>
   </xsl:template>
 
-  <xsl:template name="show-visibility">
+  <xsl:template name="show-visibility-ico">
       <xsl:choose>
 	<xsl:when test="./@visibility = '-'">
-	  <span title='private'><img src="css/icons/privattr.gif" alt="-" /></span>
+	  <span title='private'><font color='red'>&#x1F512;</font></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '+'">
-	  <span title='public'><img src="css/icons/publattr.gif" alt="+" /></span>
+	  <span title='public'><font color='green'>&#x1F511;</font></span>
 	</xsl:when>
 	<xsl:when test="./@visibility = '#'">
-	  <span title='protected'><img src="css/icons/protattr.gif" alt="#" /></span>
+	  <span title='protected'><font color='yellow'>&#x1F510;</font></span>
 	</xsl:when>
 
 	<xsl:when test="./@visibility = '- '">
@@ -513,7 +419,49 @@
       </xsl:choose>
   </xsl:template>
 
-  <xsl:template name="show-multiplicity">
+  <!-- See for more http://en.wikipedia.org/wiki/Miscellaneous_Symbols_and_Pictographs -->
+
+<!-- 1F31F - star -->
+<!-- 1F446 - pointer -->
+  <xsl:template name="show-visibility">
+      <xsl:choose>
+	<xsl:when test="./@visibility = '-'">
+	  <span title='private'><font color='red'>&#x1F512;</font></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '+'">
+	  <span title='public'><font color='green'>&#x1F511;</font></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '#'">
+	  <span title='protected'><font color='yellow'>&#x1F510;</font></span>
+	</xsl:when>
+
+	<xsl:when test="./@visibility = '- '">
+	  <span title='private'><font color='red'>&#x1F512;</font></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '+ '">
+	  <span title='public'><font color='green'>&#x1F511;</font></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '# '">
+	  <span title='protected'><font color='yellow'>&#x1F510;</font></span>
+	</xsl:when>
+
+	<xsl:when test="./@visibility = '-/'">
+	  <span title='private virtual'><img src="css/icons/virtprivoper.gif" alt="-/" /></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '+/'">
+	  <span title='public virtual'><img src="css/icons/virtpubloper.gif" alt="+/" /></span>
+	</xsl:when>
+	<xsl:when test="./@visibility = '#/'">
+	  <span title='protected virtual'><img src="css/icons/virtprotoper.gif" alt="#/" /></span>
+	</xsl:when>
+
+	<xsl:otherwise>
+	  <xsl:value-of select="./@visibility"/>
+	</xsl:otherwise>
+      </xsl:choose>
+  </xsl:template>
+
+  <xsl:template name="show-multiplicity-ico">
     <xsl:for-each select="multiplicity">
       <xsl:choose>
 	<xsl:when test="./@type = 'pointer'">
@@ -531,6 +479,35 @@
 	      <xsl:value-of select="./@bind"/>(key=<xsl:value-of select="./@key"/>)
     	    </xsl:attribute>
 	    <img src="css/icons/qualifier.gif" alt="&#x272A;" />
+	  </span> <!-- 2605 -->
+	  <sup><b><xsl:value-of select="./@bind"/></b>(key=<xsl:value-of select="./@key"/>)</sup>
+	</xsl:when>
+
+	<xsl:otherwise>
+	  <xsl:value-of select="./@multiplicity"/>
+	</xsl:otherwise>
+      </xsl:choose>
+    </xsl:for-each>
+  </xsl:template>
+
+  <xsl:template name="show-multiplicity">
+    <xsl:for-each select="multiplicity">
+      <xsl:choose>
+	<xsl:when test="./@type = 'pointer'">
+	  <span title='pointer'><font color="green">&#x24C5;</font></span><!-- &#x21B3 x27AE-->
+	</xsl:when>
+
+	<xsl:when test="./@type = 'reference'">
+	  <span title='reference'><font color="green">&#x24C7;</font></span>
+	</xsl:when>
+
+	<xsl:when test="./@type = 'quantifier'">
+	  <span>
+	    <xsl:attribute name="title">
+    	      quantifier:
+	      <xsl:value-of select="./@bind"/>(key=<xsl:value-of select="./@key"/>)
+    	    </xsl:attribute>
+	    <font color="green">&#x24C6;</font>
 	  </span> <!-- 2605 -->
 	  <sup><b><xsl:value-of select="./@bind"/></b>(key=<xsl:value-of select="./@key"/>)</sup>
 	</xsl:when>

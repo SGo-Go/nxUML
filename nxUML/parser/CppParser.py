@@ -313,48 +313,63 @@ class CppTextParser(object):
     reTypedef      = r"(\s|;|\}})typedef\s+([a-zA-Z0-9_:<>,\*&\s]+(>|\s)+){0};"
     reGetAllUsings = re.compile(r"(\s|;|\}})using\s+(namespace)?\s+(({0}\s*::\s*)*{0})\s*;".format(TypeParser.reId), re.DOTALL)
 
+    reIfdefIf   = re.compile(r"^\s*#\s*(if(n)?def|if\s+defined)\s+({0})\s*".format(TypeParser.reId))
+    reIfdefElse = re.compile(r"^#\s*else\s*")
+    # reIfdefEnd  = re.compile(r"^#\s*endif\s*".format(TypeParser.reId))
+    reIfdefEnd  = re.compile(r"^\s*#endif")
+
     @classmethod
     def parse(cls, filename, 
               uml_pool = None, 
               include_paths = [], 
-              hash_type = None):
+              hash_type = None, 
+              defined_macros = None): 
         if uml_pool is None: uml_pool = UMLPool()
 
         ########################################
         # Parse codes
         ########################################
 
-        # Pre-parsing by external package CppHeaderParser
-        import CppHeaderParser
-        try: cppHeader = CppHeaderParser.CppHeader(filename)
-        except CppHeaderParser.CppParseError as e: raise e
-
-
-        # Fill up classes table
-        classes_table = {}
-        for className, classData in cppHeader.classes.items():
-            if classData['namespace'] is None: name = classData['name']
-            else: name = '::'.join((classData['namespace'], classData['name']))
-            classes_table[name] = classData
-
-        # Fill up packages (C++ namespaces) table
-        packages_table = {}
-        for namespace in cppHeader.namespaces:
-            name, holder = cls.TypeParser.split_name(namespace)
-            packages_table[namespace] = {'name': name, 'namespace': holder}
-
-        # Parse codes which are not processed by CppHeaderParser
-        # @TODO improve performance 
-        # Reason: so far the code below is just a dirty hack 
-        #         covering lack of typedef parsing in CppHeaderParser
-        # I.e. brute search and analysis of elements which are not pparsed by CppHeaderParser
         strCppCode = ""
         typedefs_table = {} # Create typedefs table regardless of succes in filename opening
         with open(filename, "r") as fileToAnalyse:
+            strCppCode = fileToAnalyse.read()
+            # if strCppCode.find('#ifndef OMAP') > 0:
+            #     print filename
+
+            strCppCode = cls.preprocessor_remove_conditionals(strCppCode, defined_macros)
+
+            # Pre-parsing by external package CppHeaderParser
+            try: 
+                import CppHeaderParser
+                cppHeader = CppHeaderParser.CppHeader(strCppCode, argType="string",)
+            except CppHeaderParser.CppParseError as e: raise e
+
+
+            # Fill up classes table
+            classes_table = {}
+            for className, classData in cppHeader.classes.items():
+                if classData['namespace'] is None: name = classData['name']
+                else: name = '::'.join((classData['namespace'], classData['name']))
+                classes_table[name] = classData
+
+            # Fill up packages (C++ namespaces) table
+            packages_table = {}
+            for namespace in cppHeader.namespaces:
+                name, holder = cls.TypeParser.split_name(namespace)
+                packages_table[namespace] = {'name': name, 'namespace': holder}
+
+
+            # Parse codes which are not processed by CppHeaderParser
+            # @TODO improve performance 
+            # Reason: so far the code below is just a dirty hack 
+            #         covering lack of typedef parsing in CppHeaderParser
+            # I.e. brute search and analysis of elements which are not pparsed by CppHeaderParser
+
             # Remove C++ and C style comments and convert file in a single string
             strCppCode = cls.reGetAllCStyleComments.sub \
                 ("", cls.reGetCppStyleComments.sub \
-                     ("", fileToAnalyse.read())).replace('\n', ' ')
+                     ("", strCppCode)).replace('\n', ' ')
 
             #     Use find_open_scopes to find all usings 
             #     (usings are not supported by CppParseHeader)
@@ -468,6 +483,48 @@ class CppTextParser(object):
             if m.group(2) is not None: using += '::*'
             usings.append(using)
         return usings
+
+    @classmethod
+    def preprocessor_remove_conditionals(cls, strCppCode, defined_macros):
+        """Replaces by empty strings the code inside ifdef's 
+        depending on whether macros are defined or not
+
+        Behaviour:
+        defined_macros specifies the dict of macro with 
+        True value if is supposed to be defined, and
+        False value if is supposed to be undefined.
+        If macro is not in the list we make if open for the first occurance
+        i.e. defined for ifdef and undefined for ifndef
+        """
+        if defined_macros and len(defined_macros) > 0:
+            strCppReduced = ""   # preprocessed C++-code 
+            stackIfdefNames = [] # stack of names for macro used in conditionals
+            # Stack of regimes for each macro (True if insert)
+            # If there is at least one False, we use no insertion mode
+            stackIfdefModes = [] 
+            insertionMode = True
+            for line in strCppCode.split("\n"):
+                m = cls.reIfdefIf.search(line)
+                if m:
+                    nameMacro  = m.group(3)
+                    insertionModeMacro = (nameMacro not in defined_macros.keys()) \
+                        or (not(m.group(2) == 'n') == defined_macros[nameMacro])
+                    stackIfdefNames.append(nameMacro)
+                    stackIfdefModes.append(insertionModeMacro)
+                    insertionMode = insertionMode and insertionModeMacro
+                elif cls.reIfdefElse.search(line): 
+                    stackIfdefModes[-1] = not stackIfdefModes[-1]
+                    insertionMode = not(False in stackIfdefModes)
+                elif cls.reIfdefEnd.search(line): 
+                    stackIfdefNames.pop()
+                    stackIfdefModes.pop()
+                    insertionMode = not(False in stackIfdefModes)
+                else: 
+                    if insertionMode: strCppReduced += line
+                strCppReduced += '\n'
+            if len(stackIfdefNames) > 0: print [len(stackIfdefNames)]*10
+        else: strCppReduced = strCppCode
+        return strCppReduced
 
     @classmethod
     def handle_packageables(cls, uml_pool, uml_namespace, cpp_fullname, parse_table, **data):
