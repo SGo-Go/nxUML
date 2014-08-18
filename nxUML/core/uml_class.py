@@ -56,7 +56,7 @@ class UMLClass(UMLClassifier):
         self.methods.append(method)
 
     def add_methods(self, methods):
-        if not self.__dict__.has_key("methods") or self.methods is None:
+        if not self.__dict__.has_key("operations") or self.methods is None:
             self.methods = methods
         else: self.methods.extend(methods)
 
@@ -151,7 +151,7 @@ class UMLClass(UMLClassifier):
             for attrib in self.attributes:
                 xmlAttrib = attrib.toXML(xmlAttribs)
 
-            xmlMethods      = etree.SubElement(xmlClass, "methods")
+            xmlMethods      = etree.SubElement(xmlClass, "operations")
             for method in self.methods:
                 xmlMethod = method.toXML(xmlMethods)
 
@@ -248,7 +248,7 @@ class UMLClassMethod:
             createElem = lambda root, name: etree.Element(name)
         else: createElem = etree.SubElement
 
-        xmlMethod = createElem(root, "method",
+        xmlMethod = createElem(root, "operation",
                                visibility = self.visibility,)
         if self.is_utility:
             xmlMethod.set("utility", "yes")

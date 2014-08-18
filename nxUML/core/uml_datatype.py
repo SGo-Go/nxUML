@@ -27,8 +27,7 @@ class IUMLDataType(UMLNamedElement):
         if root is None:
             xmlType = etree.Element("datatype")
         else: xmlType = etree.SubElement(root, "datatype")
-        xmlType.text = self.name
-        return xmlType
+        return super(IUMLDataType, self).toXML(xmlType, reference = reference)
 
 ######################################################################
 class UMLPrimitiveDataType(IUMLDataType):
@@ -49,7 +48,7 @@ UMLUndefined = UMLPrimitiveDataType('undefined')
 UMLReal      = UMLPrimitiveDataType('real')
 
 ######################################################################
-class UMLDataTypeStub(UMLTemplateableElement, IUMLDataType):
+class UMLDataTypeStub(IUMLDataType, UMLTemplateableElement):
     def __init__(self, name, 
                  scope = None, 
                  parameters = [],):
@@ -70,10 +69,8 @@ class UMLDataTypeStub(UMLTemplateableElement, IUMLDataType):
                    parameters = '' if len(parameters) == 0 else '<%s>' % parameters)
 
     def toXML(self, root = None, reference = False):
-        xmlType = IUMLDataType.toXML(self, root)
-        if self.scope:
-            xmlType.set("scope", self.scope.full_name)
-        return xmlType
+        # return IUMLDataType.toXML(self, root)
+        return super(UMLDataTypeStub, self).toXML(root, reference)
 
 ######################################################################
 class UMLDataTypeDecorator(IUMLElement):
@@ -118,6 +115,7 @@ class UMLDataTypeDecorator(IUMLElement):
 
         if isinstance(self.base, UMLClass):
             xmlType = UMLDataTypeStub(self.base.name, self.base.scope).toXML(root = root)
+            # print self.base.id
             xmlType.set("hrefId", self.base.id)
             xmlType.set("type", "class")
         else: 

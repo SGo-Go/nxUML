@@ -102,6 +102,11 @@ class UMLNamedElement(IUMLElement):
     def __init__(self, name, **args):
         self.name = name
 
+
+    def toXML(self, xmlElement, **args):
+        xmlElement.text = self.name
+        return xmlElement
+
 ######################################################################
 class UMLRedefinableElement(UMLNamedElement):
     """An abstract named element that, 
@@ -133,6 +138,11 @@ class UMLPackageableElement(IUMLElement):
     @scope.setter
     def scope(self, new_scope):
         self._scope = new_scope
+
+    def toXML(self, xmlElement):
+        if self.scope:
+            xmlElement.set("scope", self.scope.full_name)
+        return super(UMLPackageableElement, self).toXML(xmlElement)
 
 ######################################################################
 class UMLNamespace(UMLPackageableElement, UMLNamedElement):
@@ -209,6 +219,16 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
         if self.__dict__.has_key('_scope') and self._scope.id is not None: 
             return self._scope.id + "." + self.name
         else: return self.name
+
+    def toXML(self, xmlElement, reference):
+        # if not reference:
+        #     if len(self.named_elements) > 0:
+        #         # from lxml import etree
+        #         # xmlType = etree.Element("datatype")
+        #         # for named_element in self.named_elements:
+        #         #     xmlType = etree.Element("datatype")
+        #         #     xmlElement.
+        return super(UMLNamespace, self).toXML(xmlElement)
 
 ######################################################################
 class UMLTemplateableElement(UMLNamespace):
