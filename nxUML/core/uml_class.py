@@ -134,15 +134,17 @@ class UMLClass(UMLClassifier):
             if root is None:
                 xmlClass = etree.Element("class")
             else: xmlClass = etree.SubElement(root, "class")
-            xmlClass.text   = self.name
+            xmlClass = super(UMLClass, self).toXML(root = xmlClass, reference = reference)
+
+            # xmlClass.text   = self.name
             xmlClass.set("utility", "yes" if self.is_utility else "no")
             if self.is_interface:
                 xmlClass.set("interface", "yes")
             xmlModifs       = etree.SubElement(xmlClass, "modifiers")
             xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
 
-            if self.scope is not None:
-                xmlClass.set("scope", self.scope.full_name)
+            # if self.scope is not None:
+            #     xmlClass.set("scope", self.scope.full_name)
 
             if len(self.manifestation)>0:
                 xmlClass.set("manifestation", self.manifestation)

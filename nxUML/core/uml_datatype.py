@@ -110,7 +110,6 @@ class UMLDataTypeDecorator(IUMLElement):
         return len(self.multiplicity) == 0 or self.multiplicity[0].composite
 
     def toXML(self, root = None, reference = True):
-        from lxml                 import etree
         from nxUML.core.uml_class import UMLClass
 
         if isinstance(self.base, UMLClass):

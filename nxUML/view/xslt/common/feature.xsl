@@ -16,26 +16,7 @@
     </xsl:if>
   </xsl:template>
 
-  <xsl:template name="show-attribute-tabular-summary-html">
-    <tr>
-      <td align="right" valign="top" width="25%">
-	<xsl:for-each select="datatype">
-	  <xsl:call-template name="show-reference"/>
-	  <xsl:call-template name="show-multiplicities"/>
-	  <xsl:call-template name="show-properties"/>
-	</xsl:for-each>
-      </td>
-      <td align="left" valign="top" width="25%">
-	<xsl:call-template name="show-visibility"/>
-	<xsl:call-template name="show-name"/>
-      </td>
-      <td>
-	<xsl:call-template name="show-description"/>
-      </td>
-    </tr>
-  </xsl:template>
-
-  <xsl:template name="show-attribute-signature">
+  <xsl:template name="show-attribute-signature-full">
     <xsl:call-template name="show-visibility"/>
     <xsl:call-template name="show-name"/>
     <xsl:for-each select="datatype">
@@ -45,4 +26,38 @@
     </xsl:for-each>
   </xsl:template>
 
+  <xsl:template name="show-attribute-signature-short">
+    <xsl:call-template name="show-visibility"/>
+    <xsl:call-template name="show-name"/>
+  </xsl:template>
+
+  <xsl:template name="show-operation-signature-full">
+    <xsl:call-template name="show-visibility"/>
+    <xsl:choose>
+      <xsl:when test="./@abstract = 'yes' ">
+	<i><xsl:call-template name="show-name"/></i>
+      </xsl:when>
+      <xsl:otherwise>
+	<xsl:call-template name="show-name"/>
+      </xsl:otherwise>
+    </xsl:choose>
+    (<xsl:for-each select="parameter">
+    <xsl:call-template name="show-name"/>:<xsl:apply-templates select="datatype"/>
+    <xsl:if test="not(position() = last())">, </xsl:if>
+    </xsl:for-each>):<xsl:apply-templates select="datatype"/>
+    <xsl:call-template name="show-properties"/>
+  </xsl:template>
+
+  <xsl:template name="show-operation-signature-short">
+    <xsl:call-template name="show-visibility"/>
+    <xsl:choose>
+      <xsl:when test="./@abstract = 'yes' ">
+	<i><xsl:call-template name="show-name"/></i>
+      </xsl:when>
+      <xsl:otherwise>
+	<xsl:call-template name="show-name"/>
+      </xsl:otherwise>
+      </xsl:choose>()
+      <xsl:apply-templates select="datatype"/>
+  </xsl:template>
 </xsl:stylesheet>

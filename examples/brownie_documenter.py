@@ -16,7 +16,7 @@
 ######################################################################
 """
 from nxUML.core import UMLPool, UMLPoolDocumenter, UMLClassRelationsGraph #UMLClassDiagram, 
-from nxUML.core import UMLPackage, UMLClassifier #UMLClass, 
+from nxUML.core import UMLNamespace, UMLPackage, UMLClassifier #UMLClass, 
 from brownie_uml import * #UMLBrownieUsage, UMLBrownieRealization, UMLBrownieInterface, UMLBrownieCall,UMLBrownieNotification
 
 class BrowniePoolDocumenter(UMLPoolDocumenter):
@@ -50,14 +50,31 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
             xmlClass.set('scope', uml_class.scope)
         return xmlSource
 
+
+    def packageable2XML(self, uml_packageable):
+        xmlPackageable  = uml_packageable.toXML(reference = False)
+        
+        scopeParts = []
+        scope = uml_packageable
+        while isinstance(scope.scope, UMLNamespace) and not scope.isRoot:
+            scope = scope.scope
+            scopeParts.append(scope)
+        if len(scopeParts) > 0:
+            from lxml import etree
+            xmlScope = etree.SubElement(xmlPackageable, "scope")
+            while len(scopeParts) > 0: 
+                scope = scopeParts.pop()
+                xmlScopePart = scope.toXML(xmlScope, reference = True)
+        return xmlPackageable
+
+    def package2XML(self, uml_package):
+        return self.packageable2XML(uml_package)
+
     def class2XML(self, uml_class):
         from lxml import etree
 
         classId = uml_class.id
-        xmlClass  = uml_class.toXML()
-
-        if isinstance(uml_class.scope, UMLPackage):
-            xmlScope = uml_class.scope.toXML(xmlClass, scope = True)
+        xmlClass  = self.packageable2XML(uml_class)
 
         # for rel in self.inheritances.relationships_iter(uml_class):
         #     print rel

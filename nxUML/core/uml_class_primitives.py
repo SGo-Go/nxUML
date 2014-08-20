@@ -220,15 +220,16 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
             return self._scope.id + "." + self.name
         else: return self.name
 
-    def toXML(self, xmlElement, reference):
-        # if not reference:
-        #     if len(self.named_elements) > 0:
-        #         # from lxml import etree
-        #         # xmlType = etree.Element("datatype")
-        #         # for named_element in self.named_elements:
-        #         #     xmlType = etree.Element("datatype")
-        #         #     xmlElement.
-        return super(UMLNamespace, self).toXML(xmlElement)
+    def toXML(self, root, reference):
+        xmlRoot = super(UMLNamespace, self).toXML(root)
+        if not reference:
+            if len(self.named_elements) > 0:
+                from lxml import etree
+                xmlNestedNames = etree.SubElement(root, "inner")
+                for named_element in self.named_elements.values():
+                    # print type(self.named_element)
+                    named_element.toXML(root = xmlNestedNames, reference = True)
+        return xmlRoot
 
 ######################################################################
 class UMLTemplateableElement(UMLNamespace):

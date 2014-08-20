@@ -18,7 +18,7 @@ __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 from nxUML.core.uml_class_primitives    import UMLNamespace, UMLRedefinableElement
 from nxUML.core.uml_class_relationships import UMLRelationship, UMLGeneralization
 
-class UMLClassifier(UMLNamespace, UMLRedefinableElement):
+class UMLClassifier(UMLRedefinableElement, UMLNamespace):
     """An abstract metaclass which describes (classifies) set of instances having common features.
     The classifier is a type, templateable element, redefinable element, and namespace.
     """

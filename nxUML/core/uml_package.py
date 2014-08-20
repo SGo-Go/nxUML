@@ -28,18 +28,24 @@ class UMLPackage(UMLNamespace):
     def __repr__(self):
         return str(self.full_name)
 
-    def toXML(self, root = None, reference = False, scope = False):
-        from lxml import etree
-        if scope:
-            xmlPackage = etree.SubElement(root, "scope")
-            xmlPackage.set('name', self.name)
-            xmlPackage.set('hrefId', self.id)
-            xmlPackage.text = self.full_name
+    def toXML(self, root = None, reference = False):
+        if reference:
+            from nxUML.core.uml_datatype import UMLDataTypeStub
+
+            xmlPackage = UMLDataTypeStub(self.name, self.scope).toXML(root)
+            xmlPackage.set("hrefId", self.id)
+            # xmlPackage = etree.SubElement(root, "datatype")
+            # xmlPackage.set('name', self.name)
+            # xmlPackage.set('hrefId', self.id)
+            # xmlPackage.text = self.name
         else:
+            from lxml import etree
             if root is None: 
                 xmlPackage = etree.Element("package")
             else: xmlPackage = etree.SubElement(root, "package")
-            xmlPackage.set('name', self.full_name)
-            xmlPackage.set('hrefId', self.id)
+            xmlPackage = super(UMLPackage, self).toXML(root = xmlPackage, reference = reference)
+            # # xmlPackage.set('name', self.name)
+            # xmlPackage.set('name', self.name)
+            # xmlPackage.set('hrefId', self.id)
         return xmlPackage
 
