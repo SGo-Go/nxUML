@@ -105,8 +105,8 @@ class BrownieTextParser(CppTextParser):
                 if uml_type.name == 'FormalNotification':
                     uml_iface = cls.handle_brownie_notification \
                         (uml_pool, uml_namespace, 
-                         value_type    = uml_type.parameters[0].base.id,
-                         argument_type = uml_type.parameters[1].base.id \
+                         value_type    = uml_type.parameters[0],
+                         argument_type = uml_type.parameters[1] \
                              if len(uml_type.parameters) > 1 else UMLNone, **data)
                 elif uml_type.name == 'FormalOperationCall':
                     uml_iface = cls.handle_brownie_call \

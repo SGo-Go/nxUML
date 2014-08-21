@@ -15,7 +15,7 @@ stored as networkx graph object.
 """
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
-from nxUML.core.uml_class_primitives    import UMLNamespace
+from nxUML.core.uml_class_primitives import UMLNamespace
 
 ######################################################################
 class UMLPackage(UMLNamespace):
@@ -28,24 +28,12 @@ class UMLPackage(UMLNamespace):
     def __repr__(self):
         return str(self.full_name)
 
+    @property
+    def tag(self):
+        """Specifies XML tag `package' for the serialized instances of UML packages
+        """
+        return 'package'
+
     def toXML(self, root = None, reference = False):
-        if reference:
-            from nxUML.core.uml_datatype import UMLDataTypeStub
-
-            xmlPackage = UMLDataTypeStub(self.name, self.scope).toXML(root)
-            xmlPackage.set("hrefId", self.id)
-            # xmlPackage = etree.SubElement(root, "datatype")
-            # xmlPackage.set('name', self.name)
-            # xmlPackage.set('hrefId', self.id)
-            # xmlPackage.text = self.name
-        else:
-            from lxml import etree
-            if root is None: 
-                xmlPackage = etree.Element("package")
-            else: xmlPackage = etree.SubElement(root, "package")
-            xmlPackage = super(UMLPackage, self).toXML(root = xmlPackage, reference = reference)
-            # # xmlPackage.set('name', self.name)
-            # xmlPackage.set('name', self.name)
-            # xmlPackage.set('hrefId', self.id)
+        xmlPackage = super(UMLPackage, self).toXML(root = root, reference = reference)
         return xmlPackage
-

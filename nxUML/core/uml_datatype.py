@@ -21,13 +21,19 @@ from nxUML.core.uml_multiplicity        import UMLMultiplicityStack
 from nxUML.core.uml_classifier          import UMLClassifier
 ######################################################################
 class IUMLDataType(UMLNamedElement): 
-    def toXML(self, root = None, reference = False):
-        from lxml import etree
+    @property
+    def tag(self):
+        """Specifies default XML tag `datatype' for the serialized instances of UML datatypes
+        """
+        return 'datatype'
 
-        if root is None:
-            xmlType = etree.Element("datatype")
-        else: xmlType = etree.SubElement(root, "datatype")
-        return super(IUMLDataType, self).toXML(xmlType, reference = reference)
+    # def toXML(self, root = None, reference = False):
+    #     from lxml import etree
+
+    #     if root is None:
+    #         xmlType = etree.Element("datatype")
+    #     else: xmlType = etree.SubElement(root, "datatype")
+    #     return super(IUMLDataType, self).toXML(xmlType, reference = reference)
 
 ######################################################################
 class UMLPrimitiveDataType(IUMLDataType):
@@ -36,7 +42,7 @@ class UMLPrimitiveDataType(IUMLDataType):
     def __repr__(self): return self.name
 
     def toXML(self, root = None, reference = False):
-        xmlType = super(UMLPrimitiveDataType, self).toXML(root = root, reference = reference)
+        xmlType = super(UMLPrimitiveDataType, self).toXML(root = root, reference = False)
         xmlType.set("type", "primitive")
         return xmlType
 
@@ -48,7 +54,7 @@ UMLUndefined = UMLPrimitiveDataType('undefined')
 UMLReal      = UMLPrimitiveDataType('real')
 
 ######################################################################
-class UMLDataTypeStub(IUMLDataType, UMLTemplateableElement):
+class UMLDataTypeStub(UMLTemplateableElement, IUMLDataType):
     def __init__(self, name, 
                  scope = None, 
                  parameters = [],):
@@ -68,9 +74,8 @@ class UMLDataTypeStub(IUMLDataType, UMLTemplateableElement):
             format(self=self,
                    parameters = '' if len(parameters) == 0 else '<%s>' % parameters)
 
-    def toXML(self, root = None, reference = False):
-        # return IUMLDataType.toXML(self, root)
-        return super(UMLDataTypeStub, self).toXML(root, reference)
+    def toXML(self, root = None, **kwargs):
+        return super(UMLDataTypeStub, self).toXML(root = root, reference = False)
 
 ######################################################################
 class UMLDataTypeDecorator(IUMLElement):
@@ -114,7 +119,6 @@ class UMLDataTypeDecorator(IUMLElement):
 
         if isinstance(self.base, UMLClass):
             xmlType = UMLDataTypeStub(self.base.name, self.base.scope).toXML(root = root)
-            # print self.base.id
             xmlType.set("hrefId", self.base.id)
             xmlType.set("type", "class")
         else: 

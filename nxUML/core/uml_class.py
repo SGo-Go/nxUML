@@ -66,10 +66,6 @@ class UMLClass(UMLClassifier):
     def add_usage(self, iface_id):
         self.usages.append(iface_id)
 
-    # @property
-    # def id(self):
-    #     return self.name
-
     @property
     def modifiers(self):
         modifiers  = []
@@ -79,8 +75,8 @@ class UMLClass(UMLClassifier):
         return modifiers
 
     def has_modifiers(self):
-        if self.is_interface:     return True
-        if self.is_utility:       return True
+        if self.is_interface:    return True
+        if self.is_utility:      return True
         if len(self._modifiers): return True
         return False
 
@@ -119,44 +115,17 @@ class UMLClass(UMLClassifier):
         for uml_method in self.methods:
             if uml_method.visibility[0] == visibility:
                 yield (uml_method)
+    @property
+    def tag(self):
+        """Specifies XML tag `class' for the serialized instances of UML classes
+        """
+        return 'class'
 
     def toXML(self, root = None, reference = False):
-        if reference:
-            from nxUML.core.uml_datatype import UMLDataTypeStub
-
-            xmlClass = UMLDataTypeStub(self.name, self.scope).toXML(root)
-            xmlClass.set("hrefId", self.id)
-        else:
-            from lxml import etree
-
-            modifiers  = self.modifiers
-
-            if root is None:
-                xmlClass = etree.Element("class")
-            else: xmlClass = etree.SubElement(root, "class")
-            xmlClass = super(UMLClass, self).toXML(root = xmlClass, reference = reference)
-
-            # xmlClass.text   = self.name
+        xmlClass = super(UMLClass, self).toXML(root = root, reference = reference)
+        if not reference:
             xmlClass.set("utility", "yes" if self.is_utility else "no")
-            if self.is_interface:
-                xmlClass.set("interface", "yes")
-            xmlModifs       = etree.SubElement(xmlClass, "modifiers")
-            xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
-
-            # if self.scope is not None:
-            #     xmlClass.set("scope", self.scope.full_name)
-
-            if len(self.manifestation)>0:
-                xmlClass.set("manifestation", self.manifestation)
-
-            xmlAttribs      = etree.SubElement(xmlClass, "attributes")
-            for attrib in self.attributes:
-                xmlAttrib = attrib.toXML(xmlAttribs)
-
-            xmlMethods      = etree.SubElement(xmlClass, "operations")
-            for method in self.methods:
-                xmlMethod = method.toXML(xmlMethods)
-
+            if self.is_interface: xmlClass.set("interface", "yes")
         return xmlClass
 
 ######################################################################
@@ -168,7 +137,7 @@ class UMLClassAttribute(IUMLElement):
         self.name       = name
         self.type       = type
         self.visibility = visibility
-        self._utility     = utility
+        self._utility   = utility
         self.properties = []
         if constant: self.properties.append('readOnly') #friend, extern
 
@@ -176,7 +145,7 @@ class UMLClassAttribute(IUMLElement):
     def is_utility(self):
         return self._utility
 
-    def __str__(self):
+    def __repr__(self):
         return " {utility}{self.visibility} {self.name}:{self.type}".\
             format(self=self, utility = 'u' if self._utility else ' ',)
 
@@ -285,27 +254,13 @@ class UMLClassMethod:
 
 ######################################################################
 class UMLInterface(UMLClassifier): #pass
+    @property
+    def tag(self):
+        """Specifies XML tag `class' for the serialized instances of UML classes
+        """
+        return 'interface'
+
     def toXML(self, root = None, reference = False):
-        if reference:
-            from nxUML.core.uml_datatype import UMLDataTypeStub
-
-            xmlClass = UMLDataTypeStub(self.name, self.scope).toXML(root)
-            xmlClass.set("hrefId", self.id)
-            return xmlClass
-
-    # def __init__(self, name, 
-    #              scope    = None,
-    #              stereotypes = [],):
-    #     # Extract data
-    #     self.name     = str(name)
-    #     self.scope    = scope
-    #     self.stereotypes = stereotypes
-
-    # @property
-    # def id(self):
-    #     return self.name
-
-    # def __str__(self):
-    #     return r'{stereotypes}{self.scope}.{self.name}'.\
-    #         format(self=self,
-    #                stereotypes = "<<%s>>"%",".join(self.stereotypes),)
+        xmlInterface = super(UMLInterface, self).toXML(root = root, reference = reference)
+        if not reference: xmlInterface.set("interface", "yes")
+        return xmlInterface

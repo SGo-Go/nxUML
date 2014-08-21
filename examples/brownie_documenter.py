@@ -58,7 +58,8 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
         scope = uml_packageable
         while isinstance(scope.scope, UMLNamespace) and not scope.isRoot:
             scope = scope.scope
-            scopeParts.append(scope)
+            if not scope.isRoot:
+                scopeParts.append(scope)
         if len(scopeParts) > 0:
             from lxml import etree
             xmlScope = etree.SubElement(xmlPackageable, "scope")
@@ -69,6 +70,10 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
 
     def package2XML(self, uml_package):
         return self.packageable2XML(uml_package)
+
+    def interface2XML(self, uml_interface):
+        # print uml_interface.id 
+        return self.packageable2XML(uml_interface)
 
     def class2XML(self, uml_class):
         from lxml import etree

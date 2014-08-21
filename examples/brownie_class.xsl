@@ -10,6 +10,10 @@
     <xsl:call-template name="show-html-default"/>
   </xsl:template>
 
+  <xsl:template match="/interface">
+    <xsl:call-template name="show-html-default"/>
+  </xsl:template>
+
   <xsl:template match="/package">
     <xsl:call-template name="show-html-default"/>
   </xsl:template>
@@ -66,6 +70,9 @@
   <xsl:template name="show-body">
     <xsl:choose>
       <xsl:when test="name(.)='class'">
+	<xsl:call-template name="show-body-class-default"/>
+      </xsl:when>
+      <xsl:when test="name(.)='interface'">
 	<xsl:call-template name="show-body-class-default"/>
       </xsl:when>
       <xsl:when test="name(.)='package'">

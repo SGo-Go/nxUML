@@ -93,6 +93,35 @@ class IUMLElement(object):
     def id(self):
         raise NotImplementedError('{0} objects are not identifiable'.format(type(self)))
 
+    @property
+    def tag(self):
+        """Specifies XML tag for the serialized instance of the object 
+        """
+        raise NotImplementedError('{0} objects have no tag'.format(type(self)))
+
+    def toXML(self, root = None, reference = False, **args):
+        if   self.tag is None: 
+            xmlElement = root
+        elif reference:
+            from nxUML.core.uml_datatype import UMLDataTypeStub
+
+            xmlElement = UMLDataTypeStub(self.name, self.scope).toXML(root = root, reference = False)
+            xmlElement.set("hrefId", self.id)
+            xmlElement.set("type", self.tag)
+            # if isinstance(self, UMLPackageableElement):
+            #     from lxml import etree
+            #     print '-', self.scope.full_name
+            #     print '-', self.__dict__
+            #     print '-', etree.tostring(xmlElement, pretty_print=True)
+        else:
+            from lxml import etree
+
+            if root is None:
+                xmlElement = etree.Element(self.tag)
+            else: xmlElement = etree.SubElement(root, self.tag)
+
+        return xmlElement
+
 ######################################################################
 class UMLNamedElement(IUMLElement):
     """An abstract UML element that may have a name. 
@@ -102,8 +131,8 @@ class UMLNamedElement(IUMLElement):
     def __init__(self, name, **args):
         self.name = name
 
-
-    def toXML(self, xmlElement, **args):
+    def toXML(self, root = None, reference = False, **args):
+        xmlElement = super(UMLNamedElement, self).toXML(root = root, reference = reference, **args)
         xmlElement.text = self.name
         return xmlElement
 
@@ -123,10 +152,10 @@ class UMLPackageableElement(IUMLElement):
     """An element that can be embedded into namespace.
     """
     def __init__(self, scope, **args):
-        if scope is not None \
-                or (isinstance(scope, UMLElementRelativeName) and len(scope) !=0) \
-                or isinstance(scope, UMLNamedElement):
-            self._scope = scope
+        # if scope is not None \
+        #         or (isinstance(scope, UMLElementRelativeName) and len(scope) !=0) \
+        #         or (isinstance(scope, UMLNamespace)):
+        self._scope = scope
         super(UMLPackageableElement, self).__init__(**args)
 
     @property
@@ -139,10 +168,17 @@ class UMLPackageableElement(IUMLElement):
     def scope(self, new_scope):
         self._scope = new_scope
 
-    def toXML(self, xmlElement):
-        if self.scope:
-            xmlElement.set("scope", self.scope.full_name)
-        return super(UMLPackageableElement, self).toXML(xmlElement)
+    def toXML(self, root = None, reference = False, **args):
+        xmlElement = super(UMLPackageableElement, self).toXML(root = root, reference = reference, **args)
+        # if isinstance(self, UMLPackageableElement):
+        #     from lxml import etree
+        #     print '!', self.scope.full_name
+        #     print '-', etree.tostring(xmlElement, pretty_print=True)
+
+        scope = self.scope
+        if scope is not None and (isinstance(scope, UMLNamespace) and not scope.isRoot):
+            xmlElement.set("scope", scope.full_name)
+        return xmlElement
 
 ######################################################################
 class UMLNamespace(UMLPackageableElement, UMLNamedElement):
@@ -220,16 +256,17 @@ class UMLNamespace(UMLPackageableElement, UMLNamedElement):
             return self._scope.id + "." + self.name
         else: return self.name
 
-    def toXML(self, root, reference):
-        xmlRoot = super(UMLNamespace, self).toXML(root)
+    def toXML(self, root = None, reference = False, **args):
+        xmlElement = UMLNamedElement.toXML(self, root = root, reference = reference, **args)
+
+        # xmlElement = super(UMLNamespace, self).toXML(root = root, reference = reference, **args)
         if not reference:
             if len(self.named_elements) > 0:
                 from lxml import etree
-                xmlNestedNames = etree.SubElement(root, "inner")
+                xmlNestedNames = etree.SubElement(xmlElement, "inner")
                 for named_element in self.named_elements.values():
-                    # print type(self.named_element)
                     named_element.toXML(root = xmlNestedNames, reference = True)
-        return xmlRoot
+        return xmlElement
 
 ######################################################################
 class UMLTemplateableElement(UMLNamespace):

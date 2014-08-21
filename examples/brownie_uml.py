@@ -75,4 +75,6 @@ class UMLBrownieNotification(UMLBrownieInterface):
             UMLClassAttribute(name, type = value_type, 
                               # default    = argument_type,
                               visibility = visibility,),)
+        # print self.attributes[0], type(self.attributes[0].type)
+        # exit()
         super(UMLBrownieNotification, self).__init__(name, scope)

@@ -5,7 +5,7 @@
     xmlns:msxsl="urn:schemas-microsoft-com:xslt" exclude-result-prefixes="msxsl"
     xml:space="preserve">
 
-  <xsl:template match="class/attributes">
+  <xsl:template match="class/attributes | interface/attributes">
     <div class="col_100">
       <h2><span id="attributes">Attributes</span></h2>
       <table class="table">
@@ -31,7 +31,7 @@
       </table>
     </div>
   </xsl:template>
-  <xsl:template match="class/attributes[not(attribute)]">
+  <xsl:template match="class/attributes[not(attribute)] | class/attributes[not(attribute)]">
   </xsl:template>
 
 
@@ -63,36 +63,8 @@
   <!-- ************************************************** -->
   <!-- Class features tables templates -->
   <!-- ************************************************** -->
-  <xsl:template match="class/attributes">
-    <div class="col_100">
-      <h2><span id="attributes">Attributes</span></h2>
-      <table class="table">
-	<tr>
-	  <th>Type</th>
-	  <th>Name</th>
-	  <th>Description</th>
-	</tr>
-	<xsl:copy>
-	  <tr><th colspan="3">Primitive [<xsl:number value="count(attribute[datatype[1]/@type='primitive'])"/>]</th></tr>
-	  <xsl:apply-templates select="attribute[datatype[1]/@type='primitive']">
-            <xsl:sort select="datatype[1]/text()" />
-          </xsl:apply-templates>
-	  <tr><th colspan="3">Simple [<xsl:number value="count(attribute[not(datatype[1]/@type)])"/>]</th></tr>
-	  <xsl:apply-templates select="attribute[not(datatype[1]/@type)]">
-            <xsl:sort select="datatype[1]/text()" />
-          </xsl:apply-templates>
-	  <tr><th colspan="3">Classes [<xsl:number value="count(attribute[datatype[1]/@type='class'])"/>]</th></tr>
-	  <xsl:apply-templates select="attribute[datatype[1]/@type='class']">
-            <xsl:sort select="datatype[1]/text()" />
-          </xsl:apply-templates>
-	</xsl:copy>
-      </table>
-    </div>
-  </xsl:template>
-  <xsl:template match="class/attributes[not(attribute)]">
-  </xsl:template>
 
-  <xsl:template match="class/operations">
+  <xsl:template match="class/operations | interface/operations">
     <div class="col_100">
       <h2><span id="operations">Operations</span></h2>
       <table class="table">
@@ -106,7 +78,7 @@
       </table>      
     </div>
   </xsl:template>
-  <xsl:template match="class/operations[not(operation)]">
+  <xsl:template match="class/operations[not(operation)]  | interface/operations[not(operation)]">
   </xsl:template>
 
   <!-- ********************************************************* -->

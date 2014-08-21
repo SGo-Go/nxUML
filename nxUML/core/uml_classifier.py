@@ -60,3 +60,29 @@ class UMLClassifier(UMLRedefinableElement, UMLNamespace):
                     if generalization.parent.id != generalization.child.id: 
                         parentsStack.append(generalization.parent)
             yield(parent)
+
+    def toXML(self, root = None, reference = False):
+        xmlClassifier = super(UMLClassifier, self).toXML(root = root, reference = reference)
+        if not reference:
+            from lxml import etree
+
+            if self.__dict__.has_key('manifestation'):
+                if len(self.manifestation)>0:
+                    xmlClassifier.set("manifestation", self.manifestation)
+
+            if self.__dict__.has_key('modifiers'):
+                modifiers  = self.modifiers
+                xmlModifs       = etree.SubElement(xmlClassifier, "modifiers")
+                xmlModifs.text  = "" if len(modifiers) == 0 else ",".join(modifiers)
+
+            if self.__dict__.has_key('attributes'):
+                xmlAttribs      = etree.SubElement(xmlClassifier, "attributes")
+                for attrib in self.attributes:
+                    xmlAttrib = attrib.toXML(xmlAttribs)
+
+            if self.__dict__.has_key('methods'):
+                xmlMethods      = etree.SubElement(xmlClassifier, "operations")
+                for method in self.methods:
+                    xmlMethod = method.toXML(xmlMethods)
+
+        return xmlClassifier
