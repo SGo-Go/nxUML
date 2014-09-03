@@ -111,11 +111,11 @@ class BrownieTextParser(CppTextParser):
                 elif uml_type.name == 'FormalOperationCall':
                     uml_iface = cls.handle_brownie_call \
                         (uml_pool, uml_namespace, 
-                         argument_type = uml_type.parameters[0].base.id,
-                         result_type = uml_type.parameters[1].base.id \
-                             if len(uml_type.parameters) > 1 else None,
-                         error_type = uml_type.parameters[2].base.id \
-                             if len(uml_type.parameters) > 2 else None, **data)
+                         argument_type = uml_type.parameters[0],
+                         result_type = uml_type.parameters[1] \
+                             if len(uml_type.parameters) > 1 else UMLNone,
+                         error_type = uml_type.parameters[2] \
+                             if len(uml_type.parameters) > 2 else UMLNone, **data)
 
                 if uml_iface is not None:
                     cls.handle_brownie_realization(uml_pool, uml_namespace, uml_iface,

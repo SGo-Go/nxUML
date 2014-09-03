@@ -16,7 +16,10 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 from nxUML.core.uml_class_primitives    import IUMLElement
+from nxUML.core.uml_modifier            import UMLModifierStack
+
 from nxUML.core.uml_classifier          import UMLClassifier
+from nxUML.core.uml_feature             import UMLBehavioralFeature, UMLProperty
 
 ######################################################################
 class UMLClass(UMLClassifier):
@@ -129,65 +132,30 @@ class UMLClass(UMLClassifier):
         return xmlClass
 
 ######################################################################
-class UMLClassAttribute(IUMLElement):
-    def __init__(self, name, type, 
-                 visibility, 
-                 constant = False,
-                 utility = False):
-        self.name       = name
-        self.type       = type
-        self.visibility = visibility
-        self._utility   = utility
-        self.properties = []
-        if constant: self.properties.append('readOnly') #friend, extern
 
+class UMLClassAttribute(UMLProperty):
+    """A property owned by a classifier
+    """
     @property
-    def is_utility(self):
-        return self._utility
-
-    def __repr__(self):
-        return " {utility}{self.visibility} {self.name}:{self.type}".\
-            format(self=self, utility = 'u' if self._utility else ' ',)
-
-    def toXML(self, root = None):
-        from lxml import etree
-        if root is None:
-            createElem = lambda root, name: etree.Element(name)
-        else: createElem = etree.SubElement
-
-        xmlAttrib = createElem(root, "attribute",
-                               visibility = self.visibility,)
-        if self.is_utility:
-            xmlAttrib.set("utility", "yes")
-        if len(self.properties) > 0:
-            xmlAttrib.set("properties", "{%s}"%",".join(self.properties))
-
-        # @TODO move it to uml_diagram
-        if self.__dict__.has_key('unfolding_level'):
-            xmlAttrib.set('unfolding-level', str(self.unfolding_level))
-
-        xmlAttrib.text  = self.name
-        xmlType         = self.type.toXML(xmlAttrib)
-        return xmlAttrib
+    def tag(self):
+        """Specifies XML tag for the serialized instance of the object
+        """
+        return "attribute"
 
 ######################################################################
-class UMLClassMethod:
+class UMLClassMethod(UMLBehavioralFeature):
     def __init__(self, name, 
                  rtnType, parameters,
                  visibility,
                  abstract   = False,
                  utility    = False,
                  errors     = None, 
-                 properties = []):
-        self.name       = str(name)
-        self.rtnType    = rtnType
-        self.parameters = parameters
-        self.visibility = visibility
-
-        self.properties = properties
-
-        self._abstract = abstract
-        self._utility  = utility
+                 properties = UMLModifierStack()):
+        self.abstract = abstract
+        super(UMLClassMethod, self).__init__(str(name), rtnType, parameters,
+                                             visibility,
+                                             utility    = utility,
+                                             properties = properties)
 
     @property
     def is_constructor(self):
@@ -199,58 +167,31 @@ class UMLClassMethod:
 
     @property
     def is_abstract(self):
-        return self._abstract
+        return self.abstract
 
-    @property
-    def is_utility(self):
-        return self._utility
-
-    def __str__(self):
+    def __repr__(self):
         return "{abstract}{utility}{self.visibility}{self.name}(){rtnType}{properties}".\
             format(self=self, 
-                   abstract = 'a' if self._abstract else ' ',
-                   utility  = 'u' if self._utility else ' ',
-                   properties= "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),
+                   abstract = 'a' if self.is_abstract else ' ',
+                   utility  = 'u' if self.is_utility else ' ',
+                   properties= str(self.properties),
                    rtnType  = "" if self.rtnType is None else ":%s" % self.rtnType)
 
-    def toXML(self, root = None):
-        from lxml import etree
-        if root is None:
-            createElem = lambda root, name: etree.Element(name)
-        else: createElem = etree.SubElement
+    @property
+    def tag(self):
+        """Specifies XML tag for the serialized instance of the object
+        """
+        return "operation"
 
-        xmlMethod = createElem(root, "operation",
-                               visibility = self.visibility,)
-        if self.is_utility:
-            xmlMethod.set("utility", "yes")
+    def toXML(self, root = None):
+        xmlMethod = super(UMLClassMethod, self).toXML(root)
+
         if self.is_abstract:
             xmlMethod.set("abstract", "yes")
-
-        xmlMethod.text  = self.name
-
-        if len(self.properties) > 0:
-            xmlMethod.set("properties", "{%s}"%",".join(self.properties))
-
-        xmlRetType      = etree.SubElement(xmlMethod, 'datatype')
-        xmlRetType.text = self.rtnType
-
-        xmlRetType      = etree.SubElement(xmlMethod, 'parameters')
-        xmlRetType.text = self.rtnType
-
-        # xmlParams       = etree.SubElement(xmlMethod, 'parameters')
-        for paramId, parameter in zip(xrange(len(self.parameters)), self.parameters):
-            paramName, paramType = parameter
-            xmlParam      = etree.SubElement(xmlMethod, #xmlParams, 
-                                             'parameter')
-            xmlParam.set('id', str(paramId))
-            xmlParamType  = etree.SubElement(xmlParam, 'datatype')
-            xmlParam.text = paramName
-            xmlParamType.text = paramType
 
         # if self.rtnType is not None:
         #     xmlRetType      = self.rtnType.toXML(xmlMethod)
         return xmlMethod
-
 
 ######################################################################
 class UMLInterface(UMLClassifier): #pass

@@ -23,6 +23,7 @@ from nxUML.core import debug,warning
 
 from nxUML.core import UMLPool
 from nxUML.core import UMLQualifier, UMLMultiplicity
+from nxUML.core import UMLModifierStack
 from nxUML.core import UMLElementRelativeName, UMLDataTypeDecorator
 from nxUML.core import UMLPackage, UMLClass, UMLNamespace
 from nxUML.core import UMLPrimitiveDataType, UMLDataTypeStub
@@ -42,6 +43,8 @@ class CppTypeParser(object):
         'short'     : UMLInt,
         'signed'    : UMLInt,
         'unsigned'  : UMLInt,
+        'unsigned int'  : UMLInt,
+        'signed int'    : UMLInt,
         'unsigned short'    : UMLInt,
         'unsigned char'     : UMLInt,
         'char'      : UMLInt,
@@ -103,12 +106,15 @@ class CppTypeParser(object):
     reRefPtr    = r"(\*(\s*const)?|&)"
 
     # Compiled regexps in use
-    reFindId                  = re.compile(r"^\s*(template\s+)?({reId})\s*".format(reId=reId))
+    reFindId                  = re.compile(r"^\s*({reId})\s*".format(reId=reId))
+    reFindTypeId              = re.compile(r"^\s*(template\s+)?(((unsigned|signed)\s+(int|short|long))|({reId}))\s*".format(reId=reId))
     reFindNamespaceSeparator  = re.compile(r"^\s*::\s*")
     reFindSuffixSpecifier     = re.compile(r"^\s*(const)\s*".\
                                                format(reSpecifier=r"|".join(cpp_specifiers.keys())))
     reFindPrefixSpecifier     = re.compile(r"^\s*({reSpecifier})\s+".\
                                                format(reSpecifier=r"|".join(cpp_specifiers.keys())))
+    # reFindPrefixNumeric       = re.compile(r"^\s*(unsigned|signed)\s+".\
+    #                                            format(reSpecifier=r"|".join(cpp_specifiers.keys())))
     reFindRefPtr              = re.compile(r"^\s*{reRefPtr}\s*".\
                                                format(reScope=reScope, reId=reId, reRefPtr=reRefPtr))
     reCheckEmpty              = re.compile(r"^\s*$")
@@ -158,6 +164,27 @@ class CppTypeParser(object):
         else: return cpp_name_parts[0], None
 
     @classmethod
+    def parse_operation_parameter(cls, strName, strType):
+        stTypeAndName = strType + ' ' + strName
+        parsedType, ptr = cls.parse_from_pointer(stTypeAndName, 0)
+
+        m = cls.reFindId.search(stTypeAndName[ptr:])
+        if m is None:
+            name = ""
+        else:
+            ptr += len(m.group(0))
+
+            if m.group(1) is not None: keywordTemplate = True
+            else: keywordTemplate = False
+            
+            name = m.group(1)
+            del m
+
+        if not cls.reCheckEmpty.match(stTypeAndName[ptr:]) : 
+            raise ValueError('Type parsing error: End of type "%s" is expected at [%s]' % (strType, ptr))
+        return name, parsedType
+
+    @classmethod
     def parse(cls, strType):
         parsedType, ptr = cls.parse_from_pointer(str(strType), 0)
         if not cls.reCheckEmpty.match(strType[ptr:]) : 
@@ -200,7 +227,7 @@ class CppTypeParser(object):
     @classmethod
     def parse_from_pointer(cls, strType, ptr):
         currPointer = ptr
-        properties  = []
+        properties  = UMLModifierStack()
         parameters  = []
 
         # Expressions are saved as constrant string literals
@@ -217,10 +244,22 @@ class CppTypeParser(object):
                 currPointer += len(m.group(0))
         del m
 
+
+        # m = cls.reFindPrefixNumeric.search(strType[currPointer:])
+        # if m is None: numericPrefix = ""
+        # else:
+        #     numericPrefix = m.group(1) + ' '
+        #     currPointer  += len(m.group(0))
+        #     del m
+
         scope = UMLElementRelativeName()
         while True:
-            m = cls.reFindId.search(strType[currPointer:])
-            if m is not None:
+            m = cls.reFindTypeId.search(strType[currPointer:])
+            if m is None:
+                # if len(numericPrefix) > 0: name = ""
+                # else:
+                raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
+            else:
                 currPointer += len(m.group(0))
 
                 if m.group(1) is not None: keywordTemplate = True
@@ -228,8 +267,6 @@ class CppTypeParser(object):
 
                 name = m.group(2)
                 del m
-            else:
-                raise ValueError('Type parsing error: cannot be used as a typename "%s" [%s]' % (strType, currPointer))
 
             if name in cls.cpp_specifiers.keys(): 
                 raise ValueError('Type parsing error: keyword "%s" cannot be used as a typename "%s" [%s]' % (name, strType, currPointer))
@@ -237,7 +274,6 @@ class CppTypeParser(object):
             currPointer, params = cls.get_template_parameters(strType, currPointer)
             if keywordTemplate and params is None:
                 raise ValueError('Type parsing error: Templated scope has no parameters in a typename "%s" [%s]' % (name, strType, currPointer))
-                
 
             m = cls.reFindNamespaceSeparator.search(strType[currPointer:])
             if m is None: break # part of name, not scope
@@ -247,6 +283,7 @@ class CppTypeParser(object):
                 # @TODO here one may add some code for propper namespaces treatment
                 scope.append(name)
 
+        # name = numericPrefix + name
         if params is not None and len(params) > 0:
             for param in params:
                 parsedType = cls.parse(param)
@@ -387,7 +424,7 @@ class CppTextParser(object):
 
                         # Filter out typedefs for function pointers
                         # @TODO implement proper work arount typedefs for pointers 
-                        if cls.TypeParser.reFindId.search(typedef) is not None:
+                        if cls.TypeParser.reFindTypeId.search(typedef) is not None:
                             m = re.search(cls.reTypedef.format(typedef), strCppCode)
                             if m is not None:
                                 typedefs_table['::'.join((className, typedef))] = {\
@@ -632,11 +669,30 @@ class CppTextParser(object):
         visibility = cls.visibility_types.get(kwargs['visibility'], ' ')
         visibility+= {True:'/', False: ' '}[kwargs['virtual'] and not abstract]
 
-        rtnType    = kwargs['rtnType'] #cls.TypeParser.primitive_types.get(kwargs['rtnType'], kwargs['rtnType'])
-        # rtnType    = cls.TypeParser.parse(kwargs['rtnType'])
-        parameters = [(param['name'], param['type']) for param in kwargs['parameters']]
+        # rtnType    = kwargs['rtnType'] #cls.TypeParser.primitive_types.get(kwargs['rtnType'], kwargs['rtnType'])
 
-        properties = []
+        # @Dirty hack:
+        #   CppHeaderParser recognizes ~ as type if 
+        #   there are spaces between ~ and identifier in destructor
+        if kwargs['rtnType'] == "~":
+            rtnType    = UMLDataTypeDecorator(UMLNone)
+            name   = "<<destroy>>"
+            # if kwargs['constructor']: 
+            #     kwargs['constructor'], kwargs['destructor'] = False, True
+
+        # @Dirty hack:
+        #   CppHeaderParser recognizes inline before constructor/destructor as a type
+        elif kwargs['rtnType'] == "inline":
+            rtnType    = UMLDataTypeDecorator(UMLNone)
+            # name   = "<<destroy>>"
+            # if kwargs['constructor']: 
+            #     kwargs['constructor'], kwargs['destructor'] = False, True
+        else:
+            rtnType    = cls.TypeParser.parse(kwargs['rtnType'])
+
+        parameters = [cls.TypeParser.parse_operation_parameter(param['name'], param['type']) for param in kwargs['parameters']]
+
+        properties = UMLModifierStack()
         if kwargs['const']: properties.append('query') #friend, extern
 
         uml_method = UMLClassMethod(name, rtnType, parameters,

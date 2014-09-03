@@ -44,17 +44,17 @@
 
   <xsl:include href = "../nxUML/view/xslt/common/feature.xsl"/>
   <xsl:include href = "../nxUML/view/xslt/html/html-summary.xsl"/>
-  <xsl:template match="class/attributes/attribute">
+  <xsl:template match="//attributes/attribute">
     <xsl:call-template name="show-attribute-tabular-summary-html"/>
   </xsl:template>
-  <xsl:template match="class/operations/operation">
+  <xsl:template match="//operations/operation">
     <xsl:call-template name="show-operation-tabular-summary-html"/>
   </xsl:template>
 
-  <xsl:template match="class/relationships/relationship[@direction='in']">
+  <xsl:template match="//relationships/relationship[@direction='in']">
     <xsl:call-template name="show-in-relationship-item-html"/>
   </xsl:template>
-  <xsl:template match="class/relationships/relationship[@direction='out']">
+  <xsl:template match="//relationships/relationship[@direction='out']">
     <xsl:call-template name="show-out-relationship-item-html"/>
   </xsl:template>
 

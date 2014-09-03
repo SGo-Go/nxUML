@@ -21,7 +21,7 @@
   <!-- ************************************************** -->
   <!-- Relationships templates -->
   <!-- ************************************************** -->
-  <xsl:template match="class/relationships">
+  <xsl:template match="//relationships">
     <h2><span id="relationships">Relationships</span></h2>
     <xsl:call-template name="brownie-relationships"/>
     <xsl:call-template name="inheritance-relationships"/>
@@ -42,6 +42,7 @@
 	      <th class="message"><xsl:value-of select="@type"/></th>
 	    </xsl:for-each>
 	  </tr>
+
 	  <tr>
 	    <xsl:for-each select="relationship">
 	      <td class="message"><xsl:apply-templates select="datatype[2]"/></td>
@@ -49,20 +50,34 @@
 	  </tr>
 	</table>      
       </xsl:for-each>
-      <div class="clearfix"></div>
 
-      <xsl:if test="relationship[@type='brownie::usage']">
+      <div class="clearfix"></div>
+      <xsl:if test="relationship[@type='brownie::usage' and @direction='out']">
 	<h4>Require (concretes):</h4>
 	<ul>
-	  <xsl:apply-templates select="relationship[@type='brownie::usage']"/>
+	  <xsl:apply-templates select="relationship[@type='brownie::usage' and @direction='out'] "/>
 	</ul>
       </xsl:if>
-      <xsl:if test="relationship[@type='brownie::realization']">
+      <xsl:if test="relationship[@type='brownie::usage' and @direction='in']">
+	<h4>Required by (concretes):</h4>
+	<ul>
+	  <xsl:apply-templates select="relationship[@type='brownie::usage' and @direction='in'] "/>
+	</ul>
+      </xsl:if>
+
+      <xsl:if test="relationship[@type='brownie::realization' and @direction='out']">
 	<h4><span id="Brownie_provide">Provide (formals):</span> </h4>
 	<ul>
-	  <xsl:apply-templates select="relationship[@type='brownie::realization']"/>
+	  <xsl:apply-templates select="relationship[@type='brownie::realization' and @direction='out']"/>
 	</ul>
       </xsl:if>
+      <xsl:if test="relationship[@type='brownie::realization' and @direction='in']">
+	<h4><span id="Brownie_provide">Provided by (formal):</span> </h4>
+	<ul>
+	  <xsl:apply-templates select="relationship[@type='brownie::realization' and @direction='in']"/>
+	</ul>
+      </xsl:if>
+
     </div>
   </xsl:template>
 

@@ -36,6 +36,7 @@ TODO list:
     can produce and read XML and/or JSON representations of UML element instances
   * a template system for document outputs
   * an interface to Django framework and Jinja2
+  * integration with numba for faster parsing and output
 
 Copyright (C) 2014 nxUML, All Right Reserved
 License: GPL

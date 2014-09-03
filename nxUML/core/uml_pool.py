@@ -160,19 +160,19 @@ class UMLPoolDocumenter(object):
                                                    )
         self.inheritances.import_relationships(self.pool)
 
-        self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
-                                                   with_generalizations = False,
-                                                   with_interfaces = False,
-                                                   auto_aggregation = True,
-                                                   forced_relationships = True
-                                                   )
+        # self.aggregations = UMLClassRelationsGraph(uml_pool = uml_pool, 
+        #                                            with_generalizations = False,
+        #                                            with_interfaces = False,
+        #                                            auto_aggregation = True,
+        #                                            forced_relationships = True
+        #                                            )
 
-        self.ifaces = UMLClassRelationsGraph(uml_pool = uml_pool, 
-                                             with_generalizations = False,
-                                             with_interfaces = True,
-                                             auto_aggregation = False,
-                                             forced_relationships = True
-                                             ).reverse()
+        # self.ifaces = UMLClassRelationsGraph(uml_pool = uml_pool, 
+        #                                      with_generalizations = False,
+        #                                      with_interfaces = True,
+        #                                      auto_aggregation = False,
+        #                                      forced_relationships = True
+        #                                      ).reverse()
 
     def class2XML(self, classId):
         uml_class = self.pool.Class[classId]

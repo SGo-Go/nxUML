@@ -5,7 +5,7 @@
     xmlns:msxsl="urn:schemas-microsoft-com:xslt" exclude-result-prefixes="msxsl"
     xml:space="preserve">
 
-  <xsl:template match="class/attributes | interface/attributes">
+  <xsl:template match="//attributes">
     <div class="col_100">
       <h2><span id="attributes">Attributes</span></h2>
       <table class="table">
@@ -31,7 +31,7 @@
       </table>
     </div>
   </xsl:template>
-  <xsl:template match="class/attributes[not(attribute)] | class/attributes[not(attribute)]">
+  <xsl:template match="//attributes[not(attribute)]">
   </xsl:template>
 
 
@@ -64,7 +64,7 @@
   <!-- Class features tables templates -->
   <!-- ************************************************** -->
 
-  <xsl:template match="class/operations | interface/operations">
+  <xsl:template match="//operations">
     <div class="col_100">
       <h2><span id="operations">Operations</span></h2>
       <table class="table">
@@ -78,21 +78,38 @@
       </table>      
     </div>
   </xsl:template>
-  <xsl:template match="class/operations[not(operation)]  | interface/operations[not(operation)]">
+  <xsl:template match="//operations[not(operation)]">
   </xsl:template>
 
   <!-- ********************************************************* -->
   <!-- List of nested elements  -->
   <!-- ********************************************************* -->
+  <xsl:key name="inner-type-key" match="//inner/datatype" use="@type"/> 
+
   <xsl:template match="//inner">
     <h2><span id="inner">Inner elements</span></h2>
-    <ul>
-      <!-- <xsl:for-each select="datatype[@type='class']"> -->
-      <xsl:for-each select="datatype">
-        <xsl:sort select="text()" />
-	<li><xsl:call-template name="show-reference"/></li>
-      </xsl:for-each>
-    </ul>
+
+    <!-- <xsl:for-each select="datatype[generate-id()=generate-id(key('inner-type-key',@type)[1])]"> -->
+    <xsl:for-each select="datatype[count(. | key('inner-type-key',@type)[1]) = 1]">
+      <xsl:sort select="@type" />
+      <h3><span>
+	<!-- id="inner_classes" -->
+	<xsl:value-of select="@type"/>
+      </span></h3>
+      <ul>
+    	<xsl:for-each select="key('inner-type-key',@type)">
+          <xsl:sort select="text()" />
+    	  <li><xsl:call-template name="show-reference"/></li>
+    	</xsl:for-each>
+      </ul>
+    </xsl:for-each>
+
+    <!-- <ul> -->
+    <!--   <xsl:for-each select="datatype"> -->
+    <!--     <xsl:sort select="text()" /> -->
+    <!-- 	<li><xsl:call-template name="show-reference"/></li> -->
+    <!--   </xsl:for-each> -->
+    <!-- </ul> -->
   </xsl:template>
 
   <xsl:template name="show-internal-menu">

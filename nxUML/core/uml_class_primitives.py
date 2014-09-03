@@ -145,6 +145,12 @@ class UMLRedefinableElement(UMLNamedElement):
     """
     @property
     def isLeaf(self):
+        """Indicates whether it is possible to redefine the element in subclasses. 
+        
+        If the value is true, then it is not possible to further redefine the element. 
+        E.g., in *Java* language it corresponds to the `final` class, 
+        in *C#* - to the `sealed` class.
+        """
         return True
 
 ######################################################################
