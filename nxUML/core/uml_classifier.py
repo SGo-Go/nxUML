@@ -22,7 +22,7 @@ class UMLClassifier(UMLRedefinableElement, UMLNamespace):
     """An abstract metaclass which describes (classifies) set of instances having common features.
     The classifier is a type, templateable element, redefinable element, and namespace.
     """
-    def __init__(self, name, scope, subclasses = None, **args):
+    def __init__(self, name, scope, **args):
 
         self.relationships = []
         super(UMLClassifier, self).__init__(name=name, scope=scope, **args)
@@ -80,9 +80,9 @@ class UMLClassifier(UMLRedefinableElement, UMLNamespace):
                 for attrib in self.attributes:
                     xmlAttrib = attrib.toXML(xmlAttribs)
 
-            if self.__dict__.has_key('methods'):
-                xmlMethods      = etree.SubElement(xmlClassifier, "operations")
-                for method in self.methods:
-                    xmlMethod = method.toXML(xmlMethods)
+            if self.__dict__.has_key('operations'):
+                xmlOperations = etree.SubElement(xmlClassifier, "operations")
+                for operation in self.operations:
+                    xmlOperation = operation.toXML(xmlOperations)
 
         return xmlClassifier

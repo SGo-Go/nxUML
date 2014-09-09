@@ -49,7 +49,7 @@ class BrownieTextParser(CppTextParser):
         super(BrownieTextParser,cls).handle_attribute(uml_class, **kwargs)
 
     @classmethod
-    def handle_method(cls, uml_class, **kwargs):
+    def handle_operation(cls, uml_class, **kwargs):
         name = kwargs['name']
         if name in ('onStatus',
                     'onDenotification',
@@ -63,7 +63,7 @@ class BrownieTextParser(CppTextParser):
                       'handleSessionNotification',
                       'handleNotificationStatus',
                       ): 
-            # if 'ServiceCallable' in uml_class.modifiers:
+            # if 'ServiceCallable' in uml_class.stereotypes:
             #     print uml_class.name, name
             pass
         elif name in ('handleCall',
@@ -71,7 +71,7 @@ class BrownieTextParser(CppTextParser):
                       'onResult'):
             pass
         else:
-            return super(BrownieTextParser,cls).handle_method(uml_class, **kwargs)
+            return super(BrownieTextParser,cls).handle_operation(uml_class, **kwargs)
 
     # @classmethod
     # def handle_class(cls, uml_pool, **data):
@@ -85,7 +85,7 @@ class BrownieTextParser(CppTextParser):
                 and len(parent.parameters) > 0 \
                 and parent.parameters[0].base.name == child.name:
             # print parent.name, parent.parameters[0].base
-            child.add_modifier(parent.name)
+            child.add_stereotype(BrownieProfile[parent.name].application(target=parent.parameters[0]))
             return None
         else:
             return super(BrownieTextParser,cls).handle_generalization(uml_pool, child, parent,**kwargs)

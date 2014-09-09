@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="12.2">
+  <zoom_level>{{ context.zoom }}</zoom_level>
+  <element>
+    <type>com.umlet.element.Class</type>
+    <coordinates>
+      <x>10</x>
+      <y>10</y>
+      <w>{{ context.width }}</w>
+      <h>{{ context.height }}</h>
+    </coordinates>
+    <panel_attributes>&lt;&lt;{{ uml_class.stereotypes|e }}&gt;&gt;
+{% if- uml_class.is_interface -%}
+*/{{ uml_class.name }}/*
+{%- else -%}
+*{{ uml_class.name }}*{%- endif %}
+ {{ uml_class.properties }}
+--
+{% for attrib in uml_class.attributes|sort(attribute='name') -%}
+{{ attrib.visibility }} {{ attrib.name|e }}:{{ attrib.type.name|e }} 
+{% endfor %}
+--
+{% for operation in uml_class.operations -%}
+{% if operation.is_abstract %}/{% endif -%}
+{{ operation.visibility }}{{ operation.name|e }}():{{ operation.rtnType.name|e }}
+{%- if operation.is_abstract %}/{% endif %}
+{% endfor %}
+bg={{ context.color }}
+fg={{ context.text }}
+    </panel_attributes>
+    <additional_attributes/>
+  </element>
+</diagram>

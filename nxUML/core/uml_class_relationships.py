@@ -81,9 +81,9 @@ class UMLNaryAssociation(UMLNaryRelationship):
 ######################################################################
 
 class UMLDetalization(UMLBinaryRelationship):
-    def __init__(self, multiplicity = '', properties = [], qualifier = None):
+    def __init__(self, multiplicity = '', modifiers = [], qualifier = None):
         self.multiplicity = multiplicity
-        self.properties   = properties
+        self.modifiers   = modifiers
         #self.qualifier    = qualifier
 
 class UMLAggregation(UMLBinaryRelationship):
@@ -96,19 +96,19 @@ class UMLAggregation(UMLBinaryRelationship):
             # self.composite = attribute.type.composite
             # self.qualifier = attribute.type.qualifier
 
-            properties   = attribute.type.properties
+            modifiers   = attribute.type.modifiers
             # if len(self.qualifier) > 0:
             #     multiplicity =  '*'
             #     if attribute.type.reference:
-            #         properties = ['&'] + properties
+            #         modifiers = ['&'] + modifiers
             #     elif attribute.type.pointer:
-            #         properties = ['*'] + properties
+            #         modifiers = ['*'] + modifiers
             # else:
             #     multiplicity = attribute.type.multiplicity
             # self.part_detalization = UMLDetalization(
             #     multiplicity = multiplicity, 
             #     #, qualifier = qualifier
-            #     properties = properties)
+            #     modifiers = modifiers)
         super(UMLAggregation, self).__init__(whole, part)
 
     @property

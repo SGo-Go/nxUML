@@ -77,8 +77,8 @@
   </xsl:template>
 
   <xsl:include href = "../nxUML/view/xslt/common/property.xsl"/>
-  <xsl:template name="show-properties">
-    <xsl:call-template name="show-properties-img"/>
+  <xsl:template name="show-modifiers">
+    <xsl:call-template name="show-modifiers-img"/>
   </xsl:template>
 
   <xsl:template name="show-description">

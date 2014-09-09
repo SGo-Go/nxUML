@@ -12,7 +12,7 @@
     <xsl:if test="text() != '' ">
       <xsl:call-template name="show-reference"/>
       <xsl:call-template name="show-multiplicities"/>
-      <xsl:call-template name="show-properties"/>
+      <xsl:call-template name="show-modifiers"/>
     </xsl:if>
   </xsl:template>
 
@@ -22,7 +22,7 @@
     <xsl:for-each select="datatype">
       <xsl:call-template name="show-reference"/>
       <xsl:call-template name="show-multiplicities"/>
-      <xsl:call-template name="show-properties"/>
+      <xsl:call-template name="show-modifiers"/>
     </xsl:for-each>
   </xsl:template>
 
@@ -45,7 +45,7 @@
     <xsl:call-template name="show-name"/>:<xsl:apply-templates select="datatype"/>
     <xsl:if test="not(position() = last())">, </xsl:if>
     </xsl:for-each>):<xsl:apply-templates select="datatype"/>
-    <xsl:call-template name="show-properties"/>
+    <xsl:call-template name="show-modifiers"/>
   </xsl:template>
 
   <xsl:template name="show-operation-signature-short">

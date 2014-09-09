@@ -82,9 +82,9 @@
 
   <!-- <xsl:include href = "../nxUML/view/xslt/common/property.xsl"/> -->
   <xsl:include href = "../common/property.xsl"/>
-  <xsl:template name="show-properties">
+  <xsl:template name="show-modifiers">
     <xsl:value-of select="normalize-space()"/>
-    <xsl:call-template name="show-properties-plain"/>
+    <xsl:call-template name="show-modifiers-plain"/>
   </xsl:template>
 
 </xsl:stylesheet>

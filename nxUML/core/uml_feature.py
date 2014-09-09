@@ -75,13 +75,13 @@ class UMLStructuralFeature(UMLFeature):
 
         self.type       = type
 
-        self.properties = UMLModifierStack()
-        if constant: self.properties.append('readOnly') #friend, extern
+        self.modifiers = UMLModifierStack()
+        if constant: self.modifiers.append('readOnly') #friend, extern
         super(UMLStructuralFeature, self).__init__(name, utility)
 
     @property
     def isReadOnly(self):
-        return 'readOnly' in self.properties
+        return 'readOnly' in self.modifiers
 
     def __repr__(self):
         return " {utility}{self.visibility} {self.name}:{self.type}".\
@@ -93,23 +93,14 @@ class UMLStructuralFeature(UMLFeature):
         xmlFeature.set('visibility', self.visibility)
         xmlType = self.type.toXML(xmlFeature)
 
-        if len(self.properties) > 0:
-            xmlFeature.set("properties", str(self.properties))
+        if len(self.modifiers) > 0:
+            xmlFeature.set("modifiers", str(self.modifiers))
 
         # # @TODO move it to uml_diagram
         # if self.__dict__.has_key('unfolding_level'):
         #     xmlAttrib.set('unfolding-level', str(self.unfolding_level))
 
         return xmlFeature
-
-############################################################
-class UMLProperty(UMLStructuralFeature): 
-    """A property is a structural feature which could represent
-    * an attribute of a classifier, or
-    * a member end of association, or
-    * a part of a structured classifier.
-    """
-    pass
 
 ############################################################
 # Behavioral
@@ -124,49 +115,29 @@ class UMLBehavioralFeature(UMLFeature):
                  rtnType, parameters,
                  visibility,
                  utility    = False,
-                 properties = UMLModifierStack()):
+                 modifiers = UMLModifierStack()):
         self.visibility = visibility
 
         self.rtnType    = rtnType
         self.parameters = parameters
 
-        self.properties = properties
-        # if constant: self.properties.append('readOnly') #friend, extern
+        self.modifiers = modifiers
+        # if constant: self.modifiers.append('readOnly') #friend, extern
         super(UMLBehavioralFeature, self).__init__(name, utility)
 
     @property
     def isQuery(self):
-        return 'query' in self.properties
+        return 'query' in self.modifiers
 
     def toXML(self, root = None):
         xmlFeature = super(UMLBehavioralFeature, self).toXML(root)
 
         xmlFeature.set('visibility', self.visibility)
 
-        if len(self.properties) > 0:
-            xmlFeature.set("properties", str(self.properties))
+        if len(self.modifiers) > 0:
+            xmlFeature.set("modifiers", str(self.modifiers))
 
-        from lxml import etree
-        # if isinstance(self.rtnType, str):
-        #     xmlRetType      = etree.SubElement(xmlFeature, 'datatype')
-        #     xmlRetType.text = self.rtnType
-        # else:
-        xmlRetType = self.rtnType.toXML(xmlFeature)
+        xmlRetType = self.rtnType.toXML(xmlFeature, reference = True)
+        xmlParams  = self.parameters.toXML(xmlFeature)
 
-        # xmlRetType      = etree.SubElement(xmlFeature, 'parameters')
-        # xmlRetType.text = self.rtnType
-
-        # xmlParams       = etree.SubElement(xmlFeature, 'parameters')
-        for paramId, parameter in zip(xrange(len(self.parameters)), self.parameters):
-            paramName, paramType = parameter
-            xmlParam      = etree.SubElement(xmlFeature, #xmlParams, 
-                                             'parameter')
-            xmlParam.set('id', str(paramId))
-            xmlParam.text = paramName
-            # if isinstance(paramType, str):
-            #     xmlParamType  = etree.SubElement(xmlParam, 'datatype')
-            #     xmlParamType.text = paramType
-            # else:
-            xmlParamType = paramType.toXML(xmlParam)
-                
         return xmlFeature

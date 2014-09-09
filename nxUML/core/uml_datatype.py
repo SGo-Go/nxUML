@@ -80,11 +80,11 @@ class UMLDataTypeStub(UMLTemplateableElement, IUMLDataType):
 ######################################################################
 class UMLDataTypeDecorator(IUMLElement):
     def __init__(self, base, 
-                 properties = [],
+                 modifiers = [],
                  multiplicity = None):
         self.base         = base
         self.multiplicity = UMLMultiplicityStack() if multiplicity is None else multiplicity
-        self._properties  = properties
+        self._modifiers  = modifiers
         super(UMLDataTypeDecorator, self).__init__()
 
     @property
@@ -94,21 +94,21 @@ class UMLDataTypeDecorator(IUMLElement):
     def scope(self): return self.base.scope
 
     def add_property(self, name):
-        if not  self.__dict__.has_key('_properties') or self._properties is None: 
-            self._properties = []
-        self._properties.append(name)
+        if not  self.__dict__.has_key('_modifiers') or self._modifiers is None: 
+            self._modifiers = []
+        self._modifiers.append(name)
 
     @property
-    def properties(self):
-        if self.__dict__.has_key('_properties') and self._properties is not None: 
-            return self._properties
+    def modifiers(self):
+        if self.__dict__.has_key('_modifiers') and self._modifiers is not None: 
+            return self._modifiers
         else: return []
 
     def __repr__(self):
         strMulti = str(self.multiplicity)
-        return r'{self.base}{multi}{properties}'.\
+        return r'{self.base}{multi}{modifiers}'.\
             format(self=self, multi = '[%s]' % strMulti if len(strMulti) > 0 else '',
-                   properties = "" if len(self.properties) == 0 else "{%s}"%",".join(self.properties),)
+                   modifiers = "" if len(self.modifiers) == 0 else "{%s}"%",".join(self.modifiers),)
 
     @property
     def composite(self):

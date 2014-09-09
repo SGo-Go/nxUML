@@ -100,7 +100,7 @@ class BrowniePoolDocumenter(UMLPoolDocumenter):
         stereo_dict = dict([(x,None) for x in ('ServiceCallable', 'LocalCallable', 'LocalCallback')])
         for parent in uml_class.parents_dfs():
             if isinstance(parent, UMLClassifier):
-                for stereotype in parent.modifiers:
+                for stereotype in parent.stereotypes:
                     if stereotype in stereo_dict.keys():
                         stereo_dict[stereotype] = parent
 

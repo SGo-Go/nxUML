@@ -27,7 +27,8 @@ from nxUML.core import UMLModifierStack
 from nxUML.core import UMLElementRelativeName, UMLDataTypeDecorator
 from nxUML.core import UMLPackage, UMLClass, UMLNamespace
 from nxUML.core import UMLPrimitiveDataType, UMLDataTypeStub
-from nxUML.core import UMLClassMethod, UMLClassAttribute
+from nxUML.core import UMLClassOperation, UMLOperationParameter, UMLOperationParameterStack
+from nxUML.core import UMLClassAttribute
 from nxUML.core import UMLGeneralization
 from nxUML.core import UMLInterface
 from nxUML.core import UMLSourceFile,UMLSourceReference
@@ -182,7 +183,7 @@ class CppTypeParser(object):
 
         if not cls.reCheckEmpty.match(stTypeAndName[ptr:]) : 
             raise ValueError('Type parsing error: End of type "%s" is expected at [%s]' % (strType, ptr))
-        return name, parsedType
+        return UMLOperationParameter(name, parsedType)
 
     @classmethod
     def parse(cls, strType):
@@ -227,7 +228,7 @@ class CppTypeParser(object):
     @classmethod
     def parse_from_pointer(cls, strType, ptr):
         currPointer = ptr
-        properties  = UMLModifierStack()
+        modifiers  = UMLModifierStack()
         parameters  = []
 
         # Expressions are saved as constrant string literals
@@ -240,7 +241,7 @@ class CppTypeParser(object):
             if m is None: break
             else: 
                 prop = cls.cpp_specifiers[m.group(1)]
-                if prop is not None: properties.append(prop)
+                if prop is not None: modifiers.append(prop)
                 currPointer += len(m.group(0))
         del m
 
@@ -302,13 +303,13 @@ class CppTypeParser(object):
                 uml_type.add_property(cls.specifier_types[name])
             else:
                 uml_base = UMLDataTypeStub(name, scope=scope, parameters = parameters)
-                uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
+                uml_type = UMLDataTypeDecorator(uml_base, modifiers = modifiers)
         else:
             if name in cls.primitive_types.keys():
                 uml_base = cls.primitive_types[name]
             else:
                 uml_base = UMLDataTypeStub(cls.primitive_types.get(name, name), scope=scope)
-            uml_type = UMLDataTypeDecorator(uml_base, properties = properties)
+            uml_type = UMLDataTypeDecorator(uml_base, modifiers = modifiers)
 
         m = cls.reFindSuffixSpecifier.search(strType[currPointer:])
         if m is not None:
@@ -559,7 +560,7 @@ class CppTextParser(object):
                 else: 
                     if insertionMode: strCppReduced += line
                 strCppReduced += '\n'
-            if len(stackIfdefNames) > 0: print [len(stackIfdefNames)]*10
+            # if len(stackIfdefNames) > 0: print [len(stackIfdefNames)]*10
         else: strCppReduced = strCppCode
         return strCppReduced
 
@@ -594,12 +595,12 @@ class CppTextParser(object):
     def create_class(cls, uml_pool, uml_namespace, parse_table, **data):
         # Extract data
         uml_class = UMLClass(str(data['name']),
-                             scope     = uml_namespace, 
+                             scope         = uml_namespace, 
                              manifestation = data['sourceId'], 
-                             methods   = [],
-                             attribs   = [],
-                             modifiers = [],
-                             parent    = data['parent'],)
+                             operations       = [],
+                             attribs       = [],
+                             stereotypes   = [],
+                             parent        = data['parent'],)
 
         # Work around inheritances of class
         # @TODO: Move it to a propper place
@@ -628,10 +629,10 @@ class CppTextParser(object):
                 if attrib['type'].find('using ') != 0 and attrib['type'].find('friend ') != 0: 
                     cls.handle_attribute(uml_class, visibility = visibility, **attrib)
 
-        # Work around class methods
+        # Work around class operations
         for visibility in cls.visibility_types.keys():
-            for method in data['methods'][visibility]:
-                cls.handle_method(uml_class, visibility = visibility, **method)
+            for operation in data['methods'][visibility]:
+                cls.handle_operation(uml_class, visibility = visibility, **operation)
 
         
         # Register parsed class as a component of source
@@ -655,7 +656,7 @@ class CppTextParser(object):
         return uml_attrib
 
     @classmethod
-    def create_method(cls, **kwargs):
+    def create_operation(cls, **kwargs):
         if kwargs['constructor']: 
             name   = "<<create>>"
         elif kwargs['destructor']: 
@@ -690,17 +691,20 @@ class CppTextParser(object):
         else:
             rtnType    = cls.TypeParser.parse(kwargs['rtnType'])
 
-        parameters = [cls.TypeParser.parse_operation_parameter(param['name'], param['type']) for param in kwargs['parameters']]
+        # parameters = UMLOperationParameterStack([cls.TypeParser.parse_operation_parameter(param['name'], param['type']) for param in kwargs['parameters']])
+        parameters = UMLOperationParameterStack()
+        for param in kwargs['parameters']:
+            parameters.append(cls.TypeParser.parse_operation_parameter(param['name'], param['type']))
 
-        properties = UMLModifierStack()
-        if kwargs['const']: properties.append('query') #friend, extern
+        modifiers = UMLModifierStack()
+        if kwargs['const']: modifiers.append('query') #friend, extern
 
-        uml_method = UMLClassMethod(name, rtnType, parameters,
-                                    visibility = visibility,
-                                    abstract   = abstract,
-                                    utility    = static,
-                                    properties = properties)
-        return uml_method
+        uml_operation = UMLClassOperation(name, rtnType, parameters,
+                                       visibility = visibility,
+                                       abstract   = abstract,
+                                       utility    = static,
+                                       modifiers = modifiers)
+        return uml_operation
 
     @classmethod
     def create_generalization(cls, child, parent, **kwargs):
@@ -721,9 +725,9 @@ class CppTextParser(object):
         uml_class.add_attribute(uml_attrib)
 
     @classmethod
-    def handle_method(cls, uml_class, **kwargs):
-        uml_method = cls.create_method(**kwargs)
-        uml_class.add_method(uml_method)
+    def handle_operation(cls, uml_class, **kwargs):
+        uml_operation = cls.create_operation(**kwargs)
+        uml_class.add_operation(uml_operation)
 
     ############################################################
     # Handles for packageable elements 
@@ -854,7 +858,12 @@ class CppTextParser(object):
                 attrib.type.base = cls.resolve_simple_type(uml_pool, attrib.type.base, 
                                                            uml_class, name_openings)
                 # print type(attrib.type.base)
-
+            for operation in uml_class.operations:
+                operation.rtnType.base = cls.resolve_simple_type(uml_pool, operation.rtnType.base, 
+                                                                 uml_class, name_openings)
+                for param in operation.parameters:
+                    param.type.base = cls.resolve_simple_type(uml_pool, param.type.base, 
+                                                              uml_class, name_openings)
             # Loop over relationships
             # uml_source  = uml_relationship.source
             # print len(uml_class.relationships)
@@ -872,6 +881,9 @@ class CppTextParser(object):
                             embracing_scope, name_openings):
         """Resolve single name
         """
+        # @Dirty hack: if base is pure None (happens with rtnType)
+        if uml_type_base is None: return UMLNone
+
         if isinstance(uml_type_base, UMLDataTypeStub):
             path_to_try = [uml_type_base]
             for relpath in name_openings:

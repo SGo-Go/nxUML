@@ -15,7 +15,7 @@
 	<xsl:for-each select="datatype">
 	  <xsl:call-template name="show-reference"/>
 	  <xsl:call-template name="show-multiplicities"/>
-	  <xsl:call-template name="show-properties"/>
+	  <xsl:call-template name="show-modifiers"/>
 	</xsl:for-each>
       </td>
       <td align="left" valign="top" width="25%">
@@ -34,7 +34,7 @@
 	<xsl:for-each select="datatype">
 	  <xsl:call-template name="show-reference"/>
 	  <xsl:call-template name="show-multiplicities"/>
-	  <xsl:call-template name="show-properties"/>
+	  <xsl:call-template name="show-modifiers"/>
 	</xsl:for-each>
       </td>
       <td>
@@ -52,7 +52,7 @@
 	<xsl:call-template name="show-name"/>:<xsl:apply-templates select="datatype"/>
 	<xsl:if test="not(position() = last())">, </xsl:if>
 	</xsl:for-each>)
-	<xsl:call-template name="show-properties"/>
+	<xsl:call-template name="show-modifiers"/>
 	<br/>
 	<xsl:call-template name="show-description"/>
       </td>

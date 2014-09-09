@@ -16,10 +16,11 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 from nxUML.core.uml_class_primitives    import IUMLElement
-from nxUML.core.uml_modifier            import UMLModifierStack
 
-from nxUML.core.uml_classifier          import UMLClassifier
-from nxUML.core.uml_feature             import UMLBehavioralFeature, UMLProperty
+from nxUML.core.uml_stereotype  import UMLStereotypeStack, UMLStereotype
+from nxUML.core.uml_classifier  import UMLClassifier
+# from nxUML.core.uml_operation import UMLClassOperation
+# from nxUML.core.uml_property  import UMLClassAttribute
 
 ######################################################################
 class UMLClass(UMLClassifier):
@@ -28,17 +29,17 @@ class UMLClass(UMLClassifier):
     def __init__(self, name, 
                  manifestation = None, 
                  scope  = None,
-                 methods  = [],
+                 operations  = [],
                  attribs  = [],
-                 modifiers  = [],
+                 stereotypes  = UMLStereotypeStack(),
                  subclasses = None,
                  parent   = None,):
 
         # Fill data
         self.manifestation = manifestation
 
-        self._modifiers = modifiers
-        self.methods    = methods
+        self.extra_stereotypes = stereotypes
+        self.operations    = operations
         self.attributes = attribs
 
         # Fill dependencies 
@@ -55,13 +56,13 @@ class UMLClass(UMLClassifier):
             self.attributes = attribs
         else: self.attributes.extend(attribs)
 
-    def add_method(self, method):
-        self.methods.append(method)
+    def add_operation(self, operation):
+        self.operations.append(operation)
 
-    def add_methods(self, methods):
-        if not self.__dict__.has_key("operations") or self.methods is None:
-            self.methods = methods
-        else: self.methods.extend(methods)
+    def add_operations(self, operations):
+        if not self.__dict__.has_key("operations") or self.operations is None:
+            self.operations = operations
+        else: self.operations.extend(operations)
 
     def add_realization(self, iface_id):
         self.realizations.append(iface_id)
@@ -70,28 +71,28 @@ class UMLClass(UMLClassifier):
         self.usages.append(iface_id)
 
     @property
-    def modifiers(self):
-        modifiers  = []
-        if self.is_interface: modifiers.append('interface')
-        if self.is_utility:   modifiers.append('utility')
-        modifiers.extend(self._modifiers)
-        return modifiers
+    def stereotypes(self):
+        stereotypes  = UMLStereotypeStack(self.extra_stereotypes)
+        # if self.is_interface: stereotypes.append('interface')
+        if self.is_utility:   stereotypes.append(UMLStereotypeStack.utility.application())
+        stereotypes.extend(self.extra_stereotypes)
+        return stereotypes
 
-    def has_modifiers(self):
+    def has_stereotypes(self):
         if self.is_interface:    return True
         if self.is_utility:      return True
-        if len(self._modifiers): return True
+        if len(self.extra_stereotypes): return True
         return False
 
-    def add_modifier(self, modifier):
-        self._modifiers.append(modifier)
+    def add_stereotype(self, stereotype):
+        self.extra_stereotypes.append(stereotype)
 
     @property
     def is_interface(self):
         if len(self.attributes) > 0:
             return False
-        for method in self.methods:
-            if not method.is_destructor and not method.is_abstract: 
+        for operation in self.operations:
+            if not operation.is_destructor and not operation.is_abstract: 
                 return False
         return True
 
@@ -99,25 +100,24 @@ class UMLClass(UMLClassifier):
     def is_utility(self):
         for attrib in self.attributes:
             if not attrib.is_utility: return False
-        for method in self.methods:
-            if not method.is_destructor and not method.is_utility: return False
+        for operation in self.operations:
+            if not operation.is_destructor and not operation.is_utility: return False
         
         return True
 
     def __str__(self):
-        modifiers  = self.modifiers
-        return "{line}\n{modifiers:^40}\n[{self.scope}]{self.name}\n{line}\n{attributes}\n{line}\n{methods}\n{line}".\
+        return "{line}\n{stereotypes:^40}\n[{self.scope}]{self.name}\n{line}\n{attributes}\n{line}\n{operations}\n{line}".\
             format(self=self, line= chr(196)*40, #unicode('\x80abc', errors='replace')*
-                   attributes = "\n".join(map(str,self.attributes)),
-                   methods    = "\n".join(map(str,self.methods)),
-                   modifiers  = "" if len(modifiers) == 0 else "<<%s>>"%",".join(modifiers))
+                   attributes  = "\n".join(map(str,self.attributes)),
+                   operations  = "\n".join(map(str,self.operations)),
+                   stereotypes = str(self.stereotypes))
 
-    def methods_iter(self, visibility = '+'):
-        """Iterate over the methods
+    def operations_iter(self, visibility = '+'):
+        """Iterate over the operations
         """
-        for uml_method in self.methods:
-            if uml_method.visibility[0] == visibility:
-                yield (uml_method)
+        for uml_operation in self.operations:
+            if uml_operation.visibility[0] == visibility:
+                yield (uml_operation)
     @property
     def tag(self):
         """Specifies XML tag `class' for the serialized instances of UML classes
@@ -132,72 +132,10 @@ class UMLClass(UMLClassifier):
         return xmlClass
 
 ######################################################################
-
-class UMLClassAttribute(UMLProperty):
-    """A property owned by a classifier
-    """
-    @property
-    def tag(self):
-        """Specifies XML tag for the serialized instance of the object
-        """
-        return "attribute"
-
-######################################################################
-class UMLClassMethod(UMLBehavioralFeature):
-    def __init__(self, name, 
-                 rtnType, parameters,
-                 visibility,
-                 abstract   = False,
-                 utility    = False,
-                 errors     = None, 
-                 properties = UMLModifierStack()):
-        self.abstract = abstract
-        super(UMLClassMethod, self).__init__(str(name), rtnType, parameters,
-                                             visibility,
-                                             utility    = utility,
-                                             properties = properties)
-
-    @property
-    def is_constructor(self):
-        return self.name == "<<create>>" 
-
-    @property
-    def is_destructor(self):
-        return self.name == "<<destroy>>" 
-
-    @property
-    def is_abstract(self):
-        return self.abstract
-
-    def __repr__(self):
-        return "{abstract}{utility}{self.visibility}{self.name}(){rtnType}{properties}".\
-            format(self=self, 
-                   abstract = 'a' if self.is_abstract else ' ',
-                   utility  = 'u' if self.is_utility else ' ',
-                   properties= str(self.properties),
-                   rtnType  = "" if self.rtnType is None else ":%s" % self.rtnType)
-
-    @property
-    def tag(self):
-        """Specifies XML tag for the serialized instance of the object
-        """
-        return "operation"
-
-    def toXML(self, root = None):
-        xmlMethod = super(UMLClassMethod, self).toXML(root)
-
-        if self.is_abstract:
-            xmlMethod.set("abstract", "yes")
-
-        # if self.rtnType is not None:
-        #     xmlRetType      = self.rtnType.toXML(xmlMethod)
-        return xmlMethod
-
-######################################################################
 class UMLInterface(UMLClassifier): #pass
     @property
     def tag(self):
-        """Specifies XML tag `class' for the serialized instances of UML classes
+        """Specifies XML tag `interface' for the serialized instances of UML interfaces
         """
         return 'interface'
 

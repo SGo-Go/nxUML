@@ -16,7 +16,8 @@ stored as networkx graph object.
 __author__ = """Sergiy Gogolenko (sgogolenko@luxoft.com)"""
 
 from nxUML.core import UMLInterfaceUsage, UMLInterfaceRealization, UMLInterface
-from nxUML.core import UMLNone, UMLClassAttribute, UMLClassMethod
+from nxUML.core import UMLNone, UMLClassAttribute, UMLClassOperation
+from nxUML.core import UMLOperationParameterStack, UMLOperationParameter
 
 class UMLBrownieUsage(UMLInterfaceUsage):
     def __init__(self, uml_classifier, uml_iface, visibility, type = None):
@@ -57,12 +58,12 @@ class UMLBrownieCall(UMLBrownieInterface):
                  result_type   = None,
                  error_type    = None,
                  visibility    = '+ '):
-        self.methods = (
-            UMLClassMethod(name, rtnType = result_type, 
-                           parameters = (('argument', argument_type),),
-                           errors     = (error_type,),
-                           visibility = visibility,
-                           abstract   = True),)
+        self.operations = (
+            UMLClassOperation(name, rtnType = result_type, 
+                              parameters = UMLOperationParameterStack([UMLOperationParameter('argument', argument_type)]),
+                              errors     = (error_type,),
+                              visibility = visibility,
+                              abstract   = True),)
         super(UMLBrownieCall, self).__init__(name, scope)
 
 class UMLBrownieNotification(UMLBrownieInterface):
@@ -78,3 +79,15 @@ class UMLBrownieNotification(UMLBrownieInterface):
         # print self.attributes[0], type(self.attributes[0].type)
         # exit()
         super(UMLBrownieNotification, self).__init__(name, scope)
+
+from nxUML.core import UMLStereotypeStack, UMLStereotype #UMLProfile, 
+BrownieProfile = {} #UMLProfile()
+BrownieProfile['utility']        = UMLStereotypeStack.utility
+BrownieProfile['LocalCallable']  = UMLStereotype('LocalCallable')
+BrownieProfile['LocalCallback']  = UMLStereotype('LocalCallback')
+BrownieProfile['ServiceCallable']= UMLStereotype('ServiceCallable')
+
+from nxUML.core import UMLMetaproperty
+BrownieProfile['LocalCallable'].add_metaproperty(UMLMetaproperty('target', UMLNone,'+'))
+BrownieProfile['LocalCallback'].add_metaproperty(UMLMetaproperty('target', UMLNone,'+'))
+BrownieProfile['ServiceCallable'].add_metaproperty(UMLMetaproperty('target', UMLNone,'+'))

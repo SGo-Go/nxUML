@@ -5,16 +5,16 @@
     xmlns:msxsl="urn:schemas-microsoft-com:xslt" exclude-result-prefixes="msxsl"
     xml:space="preserve">
 
-  <xsl:template name="show-properties-img">
-    <xsl:value-of select="./@properties"/>
+  <xsl:template name="show-modifiers-img">
+    <xsl:value-of select="./@modifiers"/>
   </xsl:template>
 
-  <xsl:template name="show-properties-unicode">
-    <xsl:value-of select="./@properties"/>
+  <xsl:template name="show-modifiers-unicode">
+    <xsl:value-of select="./@modifiers"/>
   </xsl:template>
 
-  <xsl:template name="show-properties-plain">
-    <xsl:value-of select="./@properties"/>
+  <xsl:template name="show-modifiers-plain">
+    <xsl:value-of select="./@modifiers"/>
   </xsl:template>
 
 </xsl:stylesheet>
